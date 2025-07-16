@@ -10,6 +10,7 @@ pub mod types;
 pub mod utils;
 pub mod bridge;
 pub mod simple_engine;
+pub mod engine;
 
 pub use config::Config;
 pub use bridge::*;
@@ -18,3 +19,4 @@ pub use mempool::*;
 pub use strategies::*;
 pub use execution::*;
 pub use monitoring::*;
+pub use engine::*;
