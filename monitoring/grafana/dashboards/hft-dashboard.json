@@ -1,0 +1,66 @@
+{
+  "dashboard": {
+    "id": null,
+    "title": "Solana HFT Ninja 2025.07 Dashboard",
+    "tags": ["solana", "hft", "trading"],
+    "style": "dark",
+    "timezone": "browser",
+    "panels": [
+      {
+        "id": 1,
+        "title": "Transaction Processing Rate",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "rate(hft_transactions_processed_total[5m])",
+            "legendFormat": "TPS"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "reqps"
+          }
+        },
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0}
+      },
+      {
+        "id": 2,
+        "title": "MEV Opportunities",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "hft_mev_opportunities_found_total",
+            "legendFormat": "Total MEV Opportunities"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 0}
+      },
+      {
+        "id": 3,
+        "title": "Processing Latency",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.95, hft_transaction_processing_seconds_bucket)",
+            "legendFormat": "95th percentile"
+          },
+          {
+            "expr": "histogram_quantile(0.50, hft_transaction_processing_seconds_bucket)",
+            "legendFormat": "50th percentile"
+          }
+        ],
+        "yAxes": [
+          {
+            "unit": "s"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 24, "x": 0, "y": 8}
+      }
+    ],
+    "time": {
+      "from": "now-1h",
+      "to": "now"
+    },
+    "refresh": "5s"
+  }
+}

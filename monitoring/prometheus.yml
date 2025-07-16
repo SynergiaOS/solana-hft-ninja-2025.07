@@ -1,0 +1,32 @@
+# Prometheus Configuration for Solana HFT Ninja 2025.07
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+rule_files:
+  - "alert_rules.yml"
+
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets:
+          - alertmanager:9093
+
+scrape_configs:
+  # HFT Application Metrics
+  - job_name: 'hft-ninja'
+    static_configs:
+      - targets: ['hft-ninja:8080']
+    scrape_interval: 5s
+    metrics_path: /metrics
+    
+  # Prometheus Self-Monitoring
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+    
+  # System Metrics
+  - job_name: 'node-exporter'
+    static_configs:
+      - targets: ['node-exporter:9100']
+    scrape_interval: 10s
