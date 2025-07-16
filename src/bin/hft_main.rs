@@ -54,8 +54,11 @@ struct Args {
 
 #[tokio::main]
 async fn main() -> Result<()> {
+    // Load environment variables from .env file
+    dotenv::dotenv().ok();
+
     let args = Args::parse();
-    
+
     // Initialize logging
     tracing_subscriber::fmt()
         .with_env_filter(&args.log_level)

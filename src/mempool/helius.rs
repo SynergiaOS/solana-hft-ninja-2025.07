@@ -26,7 +26,7 @@ impl Default for HeliusConfig {
     fn default() -> Self {
         Self {
             api_key: std::env::var("HELIUS_API_KEY").unwrap_or_default(),
-            endpoint: "wss://atlas-mainnet.helius-rpc.com".to_string(),
+            endpoint: "wss://mainnet.helius-rpc.com".to_string(),
             reconnect_interval: Duration::from_secs(5),
             ping_interval: Duration::from_secs(30),
             max_reconnect_attempts: 10,

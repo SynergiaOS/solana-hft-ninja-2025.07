@@ -37,7 +37,26 @@ chmod +x scripts/*.sh
 ./scripts/setup.sh
 ```
 
-### 2. Configure
+### 2. Configure Secrets (Choose One)
+
+#### Option A: Infisical (Recommended for Production) 🔐
+
+```bash
+# Setup Infisical secrets management
+./scripts/infisical-setup.sh
+
+# Validate configuration
+./scripts/validate-infisical.sh
+
+# Run with Infisical
+docker-compose -f docker-compose.yml -f docker-compose.infisical.yml up -d
+```
+
+**Project ID**: `73c2f3cb-c922-4a46-a333-7b96fbc6301a`
+
+See [Infisical Setup Guide](docs/INFISICAL_SETUP.md) for detailed instructions.
+
+#### Option B: Local .env File
 
 Edit `.env` file with your settings:
 
@@ -52,8 +71,36 @@ PRIVATE_KEY_PATH=./config/wallet.json
 
 ### 3. Deploy
 
+#### Option A: Oracle Cloud (Recommended for Production) 🌐
+
 ```bash
+# Quick Oracle Cloud deployment to 10.0.0.59
+scp -r . opc@10.0.0.59:/opt/solana-hft-ninja/
+ssh opc@10.0.0.59
+cd /opt/solana-hft-ninja
+./scripts/deploy-oracle-cloud.sh
+
+# Access dashboard
+# http://10.0.0.59:8080/health
+# http://ninja.subnet07161247.vcn07161247.oraclevcn.com:8080
+```
+
+See [Oracle Cloud Deployment Guide](docs/ORACLE_CLOUD_DEPLOYMENT.md) for detailed instructions.
+
+#### Option B: Local Development
+
+```bash
+# Simple start
 ./scripts/start.sh
+
+# With Infisical secrets
+./scripts/run-with-infisical.sh
+
+# Docker deployment
+docker-compose up -d
+
+# Full monitoring stack
+docker-compose -f docker-compose.yml -f docker-compose.monitoring.yml up -d
 ```
 
 ## 📊 Architecture

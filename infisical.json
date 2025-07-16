@@ -1,0 +1,11 @@
+{
+  "projectId": "73c2f3cb-c922-4a46-a333-7b96fbc6301a",
+  "environment": "production",
+  "secretsPath": "/",
+  "includeImports": true,
+  "recursive": true,
+  "expandSecretReferences": true,
+  "secretOverriding": true,
+  "workspaceId": "",
+  "logLevel": "info"
+}

@@ -1,18 +1,39 @@
 version: '3.8'
 
 services:
+  # Infisical secrets management
+  infisical:
+    image: infisical/infisical:latest
+    container_name: infisical-secrets
+    restart: unless-stopped
+    environment:
+      - INFISICAL_PROJECT_ID=73c2f3cb-c922-4a46-a333-7b96fbc6301a
+      - INFISICAL_ENVIRONMENT=production
+    volumes:
+      - ./infisical:/app/infisical
+    networks:
+      - hft-network
+    command: ["infisical", "run", "--projectId", "73c2f3cb-c922-4a46-a333-7b96fbc6301a", "--env", "production", "--", "sleep", "infinity"]
+
   hft-ninja:
     build:
       context: .
       dockerfile: Dockerfile
     container_name: solana-hft-ninja
     restart: unless-stopped
+    depends_on:
+      - infisical
     env_file:
       - .env
+    environment:
+      # Infisical integration
+      - INFISICAL_PROJECT_ID=73c2f3cb-c922-4a46-a333-7b96fbc6301a
+      - INFISICAL_ENVIRONMENT=production
     volumes:
       - ./config:/app/config
       - ./logs:/app/logs
       - ./data:/app/data
+      - ./infisical:/app/infisical
     ports:
       - "8080:8080"
     networks:

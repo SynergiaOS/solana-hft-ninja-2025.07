@@ -1,0 +1,60 @@
+# Solana HFT Ninja 2025.07 Configuration
+
+[solana]
+rpc_url = "https://api.mainnet-beta.solana.com"
+ws_url = "wss://api.mainnet-beta.solana.com"
+rpc_timeout_ms = 5000
+commitment = "confirmed"
+
+[helius]
+api_key = "edbcd361-78a0-4998-bd1e-8d4666722f82"
+rpc_url = "https://mainnet.helius-rpc.com/?api-key=edbcd361-78a0-4998-bd1e-8d4666722f82"
+ws_url = "wss://mainnet.helius-rpc.com/?api-key=edbcd361-78a0-4998-bd1e-8d4666722f82"
+enable_enhanced_transactions = true
+
+[trading]
+initial_balance_sol = 1.0
+max_position_size_sol = 0.1
+max_slippage_bps = 50
+min_profit_threshold_bps = 25
+risk_limit_bps = 500
+dry_run = true
+
+[strategy]
+strategy_mode = "market_making"
+update_interval_ms = 100
+order_book_depth = 20
+spread_bps = 25
+
+[mev]
+sandwich_enabled = false
+arbitrage_enabled = true
+token_launch_enabled = false
+min_sandwich_amount = 10000
+min_arbitrage_profit_bps = 50
+
+[jito]
+enabled = false
+tip_account = "96gYZGLnJYVFmbjzopPSU6QiEV5fGqZNyN9nmNhvrZU5"
+max_tip_lamports = 100000
+
+[wallet]
+private_key_path = ""
+keypair_path = ""
+
+[risk]
+stop_loss_bps = 200
+take_profit_bps = 300
+max_drawdown_bps = 500
+risk_limit_bps = 1000
+
+[logging]
+rust_log = "info"
+log_level = "info"
+log_file_path = "logs/hft.log"
+
+[monitoring]
+metrics_port = 8080
+health_check_interval_ms = 30000
+enable_ddos_protection = false
+rate_limit_rps = 1000

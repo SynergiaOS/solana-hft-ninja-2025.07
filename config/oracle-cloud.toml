@@ -1,0 +1,189 @@
+# Oracle Cloud Configuration for Solana HFT Ninja
+# Optimized for: 10.0.0.59 (subnet07161247.vcn07161247.oraclevcn.com)
+
+[network]
+# Oracle VCN optimized settings
+bind_address = "0.0.0.0"
+metrics_port = 8080
+health_port = 8080
+max_connections = 10000
+connection_timeout = 5000
+read_timeout = 30000
+write_timeout = 30000
+
+# Oracle Cloud specific network optimizations
+tcp_nodelay = true
+tcp_keepalive = true
+tcp_keepalive_time = 600
+tcp_keepalive_interval = 60
+tcp_keepalive_probes = 3
+
+[solana]
+# Optimized RPC endpoints for Oracle Cloud
+rpc_url = "https://api.mainnet-beta.solana.com"
+ws_url = "wss://api.mainnet-beta.solana.com"
+commitment = "confirmed"
+timeout = 30
+max_retries = 3
+retry_delay = 1000
+
+# Oracle Cloud region-specific endpoints (if available)
+backup_rpc_urls = [
+    "https://solana-api.projectserum.com",
+    "https://api.mainnet-beta.solana.com",
+    "https://solana-mainnet.rpc.extrnode.com"
+]
+
+[helius]
+# Helius configuration with Oracle Cloud optimizations
+endpoint = "wss://mainnet.helius-rpc.com"
+reconnect_interval = 5
+ping_interval = 30
+max_reconnect_attempts = 10
+connection_timeout = 10000
+
+# Oracle Cloud network buffer sizes
+receive_buffer_size = 2097152  # 2MB
+send_buffer_size = 1048576     # 1MB
+
+[jito]
+# Jito configuration for Oracle Cloud
+tip_account = "96gYZGLnJYVFmbjzopPSU6QiEV5fGqZNyN9nmNhvrZU5"
+min_tip_lamports = 10000
+max_tip_lamports = 1000000
+bundle_timeout = 5000
+
+[mev]
+# MEV strategy configuration
+enabled = true
+max_slippage_bps = 50
+min_profit_threshold_bps = 10
+risk_limit_bps = 100
+
+# Oracle Cloud specific MEV settings
+latency_threshold_ms = 50
+execution_timeout_ms = 2000
+
+[monitoring]
+# Prometheus metrics configuration
+enabled = true
+port = 8080
+path = "/metrics"
+update_interval = 1000
+
+# Oracle Cloud monitoring optimizations
+buffer_size = 65536
+batch_size = 1000
+flush_interval = 5000
+
+[logging]
+# Logging configuration for Oracle Cloud
+level = "info"
+format = "json"
+output = "stdout"
+
+# Oracle Cloud logging paths
+log_file = "/var/log/solana-hft-ninja/app.log"
+error_file = "/var/log/solana-hft-ninja/error.log"
+access_file = "/var/log/solana-hft-ninja/access.log"
+
+# Log rotation
+max_file_size = "100MB"
+max_files = 10
+compress = true
+
+[security]
+# Oracle Cloud security settings
+enable_tls = true
+tls_cert_path = "/etc/ssl/certs/hft-ninja.crt"
+tls_key_path = "/etc/ssl/private/hft-ninja.key"
+
+# Rate limiting
+rate_limit_enabled = true
+rate_limit_requests_per_second = 1000
+rate_limit_burst = 2000
+
+# IP whitelist for Oracle VCN
+allowed_ips = [
+    "10.0.0.0/16",      # Oracle VCN subnet
+    "169.254.169.254",  # Oracle metadata service
+    "127.0.0.1"         # Localhost
+]
+
+[performance]
+# Oracle Cloud performance optimizations
+worker_threads = 8
+max_blocking_threads = 512
+thread_stack_size = 2097152  # 2MB
+
+# Memory settings
+max_memory_usage = "8GB"
+gc_threshold = "1GB"
+
+# Oracle Cloud specific optimizations
+use_numa = true
+cpu_affinity = [0, 1, 2, 3, 4, 5, 6, 7]  # First 8 cores
+priority = "high"
+
+[database]
+# Database configuration (if using local storage)
+type = "sqlite"
+path = "/opt/solana-hft-ninja/data/hft.db"
+max_connections = 100
+connection_timeout = 30000
+
+# Oracle Cloud storage optimizations
+wal_mode = true
+synchronous = "normal"
+cache_size = 1000000  # 1M pages
+temp_store = "memory"
+
+[alerts]
+# Alert configuration for Oracle Cloud
+enabled = true
+webhook_url = "https://hooks.slack.com/services/YOUR/SLACK/WEBHOOK"
+
+# Oracle Cloud specific alerts
+disk_usage_threshold = 80
+memory_usage_threshold = 85
+cpu_usage_threshold = 90
+network_latency_threshold = 100  # ms
+
+# Trading alerts
+failed_transaction_threshold = 5
+profit_threshold = 1000000  # lamports
+loss_threshold = 500000     # lamports
+
+[oracle_cloud]
+# Oracle Cloud specific settings
+instance_id = "auto-detect"
+compartment_id = "auto-detect"
+region = "auto-detect"
+
+# Metadata service configuration
+metadata_service_url = "http://169.254.169.254/opc/v2"
+metadata_timeout = 5000
+
+# Oracle Cloud monitoring integration
+oci_monitoring_enabled = false
+oci_logging_enabled = false
+
+# Instance optimization
+disable_cloud_agent = true
+optimize_network_stack = true
+use_sr_iov = true
+
+[backup]
+# Backup configuration for Oracle Cloud
+enabled = true
+backup_interval = 3600  # 1 hour
+backup_retention = 168  # 7 days
+
+# Oracle Object Storage integration
+oci_bucket_name = "hft-ninja-backups"
+oci_namespace = "auto-detect"
+
+# Backup paths
+config_backup_path = "/opt/solana-hft-ninja/backups/config"
+data_backup_path = "/opt/solana-hft-ninja/backups/data"
+logs_backup_path = "/opt/solana-hft-ninja/backups/logs"

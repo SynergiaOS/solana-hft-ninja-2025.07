@@ -1,0 +1,96 @@
+version: '3.8'
+
+# Infisical-specific Docker Compose configuration
+# Use with: docker-compose -f docker-compose.yml -f docker-compose.infisical.yml up
+
+services:
+  # Infisical CLI service for secret injection
+  infisical-cli:
+    image: infisical/cli:latest
+    container_name: infisical-cli
+    restart: "no"
+    environment:
+      - INFISICAL_PROJECT_ID=73c2f3cb-c922-4a46-a333-7b96fbc6301a
+      - INFISICAL_ENVIRONMENT=production
+      - INFISICAL_TOKEN=st.7ab7091a-ae4f-41ba-b31c-bde5bafa4599.47542cb1d455d61335eaca92b2f6abfa.941bf8d2786836054e1fec510dd5f86b
+    volumes:
+      - ./infisical:/app/secrets
+      - ./scripts:/app/scripts
+    networks:
+      - hft-network
+    command: |
+      sh -c "
+        echo '🔐 Fetching secrets from Infisical...'
+        infisical export --projectId=73c2f3cb-c922-4a46-a333-7b96fbc6301a --env=production --format=dotenv > /app/secrets/.env.infisical
+        echo '✅ Secrets fetched successfully'
+        tail -f /dev/null
+      "
+
+  hft-ninja:
+    depends_on:
+      - infisical-cli
+    environment:
+      # Override with Infisical-managed secrets
+      - INFISICAL_PROJECT_ID=73c2f3cb-c922-4a46-a333-7b96fbc6301a
+      - INFISICAL_ENVIRONMENT=production
+      - INFISICAL_TOKEN=st.7ab7091a-ae4f-41ba-b31c-bde5bafa4599.47542cb1d455d61335eaca92b2f6abfa.941bf8d2786836054e1fec510dd5f86b
+    volumes:
+      # Mount Infisical secrets
+      - ./infisical:/app/infisical:ro
+    command: |
+      sh -c "
+        echo '🔄 Loading secrets from Infisical...'
+        if [ -f /app/infisical/.env.infisical ]; then
+          export $$(cat /app/infisical/.env.infisical | xargs)
+          echo '✅ Infisical secrets loaded'
+        else
+          echo '⚠️  No Infisical secrets found, using default .env'
+        fi
+        exec /app/hft_main --dry-run --enable-helius --enable-mev --enable-jito --log-level info
+      "
+
+  # Infisical Web UI (optional)
+  infisical-web:
+    image: infisical/infisical:latest
+    container_name: infisical-web
+    restart: unless-stopped
+    ports:
+      - "8081:8080"
+    environment:
+      - ENCRYPTION_KEY=${INFISICAL_ENCRYPTION_KEY:-your-encryption-key}
+      - JWT_SIGNUP_SECRET=${INFISICAL_JWT_SECRET:-your-jwt-secret}
+      - JWT_REFRESH_SECRET=${INFISICAL_JWT_REFRESH_SECRET:-your-jwt-refresh-secret}
+      - JWT_AUTH_SECRET=${INFISICAL_JWT_AUTH_SECRET:-your-jwt-auth-secret}
+      - JWT_SERVICE_SECRET=${INFISICAL_JWT_SERVICE_SECRET:-your-jwt-service-secret}
+      - MONGO_URL=mongodb://mongo:27017/infisical
+      - REDIS_URL=redis://redis:6379
+    depends_on:
+      - mongo
+      - redis
+    networks:
+      - hft-network
+
+  # MongoDB for Infisical
+  mongo:
+    image: mongo:6
+    container_name: infisical-mongo
+    restart: unless-stopped
+    environment:
+      - MONGO_INITDB_ROOT_USERNAME=root
+      - MONGO_INITDB_ROOT_PASSWORD=${MONGO_PASSWORD:-infisical123}
+    volumes:
+      - mongo_data:/data/db
+    networks:
+      - hft-network
+
+  # Redis for Infisical
+  redis:
+    image: redis:7-alpine
+    container_name: infisical-redis
+    restart: unless-stopped
+    networks:
+      - hft-network
+
+volumes:
+  mongo_data:
+    driver: local

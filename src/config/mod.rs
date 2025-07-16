@@ -79,7 +79,11 @@ impl Default for RiskConfig {
 impl Config {
     pub fn load(config_path: &str) -> Result<Self, config::ConfigError> {
         let settings = config::Config::builder()
-            .add_source(config::File::with_name(&format!("{}/config", config_path)))
+            .add_source(
+                config::File::with_name(&format!("{}/config", config_path))
+                    .format(config::FileFormat::Toml)
+                    .required(false)
+            )
             .add_source(config::Environment::with_prefix("SOLANA_HFT"))
             .build()?;
 
