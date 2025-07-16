@@ -1,6 +1,6 @@
 use anyhow::Result;
 use clap::Parser;
-use solana_hft_ninja::{config::Config, engine::Engine, mempool::*};
+use solana_hft_ninja::{config::Config, engine::Engine, mempool::*, mempool::listener::HeliusConfig};
 use tokio::sync::mpsc;
 use tracing::{info, error, warn};
 use std::sync::Arc;
@@ -70,7 +70,7 @@ async fn start_enhanced_mempool_listener() -> Result<tokio::task::JoinHandle<()>
     let config = HeliusConfig {
         api_key: std::env::var("HELIUS_KEY")
             .expect("HELIUS_KEY environment variable must be set"),
-        endpoint: "https://api.helius.xyz".to_string(),
+        endpoint: "wss://mainnet.helius-rpc.com".to_string(),
         commitment: CommitmentLevel::Processed,
         max_reconnect_attempts: 10,
         reconnect_delay_ms: 1000,
@@ -118,7 +118,7 @@ async fn start_enhanced_mempool_listener() -> Result<tokio::task::JoinHandle<()>
             // Log individual DEX interactions for debugging
             for interaction in &parsed_tx.dex_interactions {
                 info!(
-                    "🔍 DEX: {} - {} at slot {} | Accounts: {}",
+                    "🔍 DEX: {} - {:?} at slot {} | Accounts: {}",
                     interaction.program.name(),
                     interaction.instruction_type,
                     parsed_tx.slot,
