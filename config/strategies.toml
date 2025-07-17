@@ -1,0 +1,98 @@
+# 🥪 Sandwich Attack Strategy
+[sandwich]
+enabled = true
+min_profit = 0.015  # SOL (zwiększone z 0.01 dla lepszej rentowności)
+max_position = 0.8   # SOL (zmniejszone z 1.0 dla risk management)
+slippage_tolerance = 0.04  # 4% (zmniejszone z 5% dla precyzji)
+priority_fee_multiplier = 2.5
+detection_threshold = 50000  # Minimum swap amount to trigger
+confidence_threshold = 0.8
+
+# ⚖️ Cross-DEX Arbitrage Strategy  
+[arbitrage]
+enabled = true
+min_profit = 0.007  # SOL (zwiększone z 0.005)
+max_position = 1.2   # SOL
+dex_pairs = ["raydium-jupiter", "orca-serum", "jupiter-orca"]
+aggressiveness = "high"  # Options: low, medium, high
+slippage_tolerance = 0.03  # 3%
+execution_timeout_ms = 5000
+price_staleness_ms = 2000
+
+# 🚀 Token Launch Sniping Strategy
+[sniping]
+enabled = true
+launch_sources = ["pump.fun", "birdeye", "dexscreener"]
+pre_launch_window = 180  # 3 minuty przed launch
+quick_sell_threshold = 3.0  # 3x take profit
+max_position = 0.5  # SOL
+min_liquidity = 1000000000  # 1 SOL minimum liquidity
+confidence_threshold = 0.85
+
+# 🔄 Jupiter Arbitrage Strategy
+[jupiter_arbitrage]
+enabled = true
+min_profit = 0.005  # SOL
+max_route_hops = 3
+route_optimization = true
+versioned_transactions = true
+slippage_tolerance = 0.025  # 2.5%
+
+# 💧 Liquidation Strategy
+[liquidation]
+enabled = true
+min_profit = 0.02  # SOL
+health_ratio_threshold = 1.1
+max_liquidation_amount = 2.0  # SOL
+protocols = ["mango", "solend", "port"]
+
+# 🛡️ Risk Management
+[risk]
+max_daily_loss = 1.6  # 20% z 8 SOL
+position_timeout = 45  # sekund
+concurrent_positions = 8
+circuit_breaker = -0.1 # -10% dzienny drawdown
+stop_loss_bps = 200
+take_profit_bps = 300
+max_position_utilization = 0.8
+
+# 📊 Performance Targets
+[targets]
+sandwich_success_rate = 0.85  # 85%
+arbitrage_min_profit_per_op = 0.003  # SOL
+snipe_max_latency_ms = 100
+position_max_duration_s = 30
+daily_profit_target = 0.4  # SOL (5% z 8 SOL)
+
+# 🔧 Technical Settings
+[technical]
+mempool_processing_target_ms = 50
+execution_latency_target_ms = 100
+bridge_communication_target_ms = 1
+memory_limit_mb = 16
+cpu_utilization_max = 0.8
+
+# 🎯 Jito Configuration
+[jito]
+enabled = true
+tip_account = "96gYZGLnJYVFmbjzopPSU6QiEV5fGqZNyN9nmNhvrZU5"
+min_tip_lamports = 10000
+max_tip_lamports = 1000000
+bundle_timeout_ms = 30000
+priority_multiplier = 2.0
+
+# 📡 Helius Configuration
+[helius]
+enabled = true
+reconnect_interval_s = 5
+ping_interval_s = 30
+max_reconnect_attempts = 10
+enhanced_transactions = true
+
+# 🔍 Monitoring
+[monitoring]
+prometheus_port = 9090
+metrics_interval_s = 5
+health_check_interval_s = 10
+alert_latency_threshold_ms = 100
+alert_error_rate_threshold = 0.05

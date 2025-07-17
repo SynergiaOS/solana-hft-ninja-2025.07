@@ -10,7 +10,7 @@ use tokio::sync::RwLock;
 use tracing::{info, warn, error, debug};
 
 use crate::mempool::{ParsedTransaction, DexInteraction};
-use crate::strategies::{AdvancedMevOpportunity as MevOpportunity, AdvancedMevStrategyType as MevStrategyType};
+use crate::strategies::mev::{AdvancedMevOpportunity as MevOpportunity, AdvancedMevStrategyType as MevStrategyType};
 
 /// Advanced MEV strategy configuration
 #[derive(Debug, Clone, Serialize, Deserialize)]

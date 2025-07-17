@@ -340,8 +340,8 @@ fn create_default_config() -> Config {
             rpc_timeout_ms: 5000,
         },
         wallet: WalletConfig {
-            private_key_path: "hft.key".to_string(),
-            keypair_path: "hft.json".to_string(),
+            private_key_path: "config/wallet.key".to_string(),
+            keypair_path: "config/wallet.json".to_string(),
         },
         trading: TradingConfig {
             initial_balance_sol: 100.0,
@@ -351,7 +351,7 @@ fn create_default_config() -> Config {
             risk_limit_bps: 500,
         },
         strategy: StrategyConfig {
-            strategy_mode: "mev_advanced".to_string(),
+            strategy_mode: "market_making".to_string(),
             update_interval_ms: 100,
             order_book_depth: 20,
             spread_bps: 25,

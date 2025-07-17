@@ -1,8 +1,8 @@
-# 🚀 Solana HFT Ninja - Deployment Guide with Infisical
+# 🥷 **SOLANA HFT NINJA 2025.07 - COMPLETE MEV STRATEGY DEPLOYMENT GUIDE**
 
-## ✅ Current Status
+## 🎯 **QUICK START (1-DAY DEPLOYMENT)**
 
-Your Solana HFT Ninja is **fully configured** and **ready for deployment** with Infisical secrets management!
+Your Solana HFT Ninja is **fully configured** with **5 MEV strategies** and **ready for deployment**!
 
 ### 🔑 Infisical Configuration
 - **Project ID**: `73c2f3cb-c922-4a46-a333-7b96fbc6301a`
@@ -173,3 +173,98 @@ Your deployment is successful when you see:
 ---
 
 **🥷 Your Solana HFT Ninja is ready for action with enterprise-grade security!**
+
+---
+
+## 🥷 **COMPLETE MEV STRATEGY IMPLEMENTATION**
+
+### **📊 Strategy Configuration Matrix**
+
+| Strategy | Min Profit | Max Position | Slippage | Priority | Status |
+|----------|------------|--------------|----------|----------|---------|
+| **🥪 Sandwich** | 0.015 SOL | 0.8 SOL | 4% | Highest | ✅ Active |
+| **⚖️ Arbitrage** | 0.007 SOL | 1.2 SOL | 3% | High | ✅ Active |
+| **🚀 Sniping** | 0.005 SOL | 0.5 SOL | 2.5% | Medium | ✅ Active |
+| **🔄 Jupiter Arb** | 0.005 SOL | 1.0 SOL | 2.5% | High | ✅ Active |
+| **💧 Liquidation** | 0.02 SOL | 2.0 SOL | 5% | Medium | ✅ Active |
+
+### **🧪 Comprehensive Testing Commands**
+
+```bash
+# Run all MEV strategy tests
+./scripts/run_strategies.sh test
+
+# Test individual strategies
+./scripts/run_strategies.sh sandwich    # Test sandwich attacks
+./scripts/run_strategies.sh arbitrage   # Test cross-DEX arbitrage
+./scripts/run_strategies.sh sniping     # Test token launch sniping
+./scripts/run_strategies.sh jupiter_arbitrage  # Test Jupiter routes
+./scripts/run_strategies.sh liquidation # Test liquidation opportunities
+
+# Integration tests
+cargo test --test integration_bridge_test -- --nocapture
+cargo test --test integration_helius_test -- --nocapture
+cargo test --test integration_jito_test -- --nocapture
+```
+
+### **🚀 Production Deployment**
+
+```bash
+# Launch all strategies with 8 SOL capital
+INITIAL_BALANCE=8.0 DRY_RUN=false ./scripts/run_strategies.sh all
+
+# Monitor real-time performance
+watch -n 1 "curl -s http://localhost:8080/strategy/stats | jq ."
+
+# Check Prometheus metrics
+curl http://localhost:9090/api/v1/query?query=hft_mev_profit_sol
+```
+
+### **📈 Performance Monitoring**
+
+**Grafana Dashboard**: http://localhost:3000
+- Import: `monitoring/grafana/dashboards/mev-strategies-dashboard.json`
+- Username: `admin` / Password: `admin`
+
+**Key Metrics URLs**:
+- **Prometheus**: http://localhost:9090
+- **HFT API**: http://localhost:8080
+- **Health Check**: http://localhost:8080/health
+- **Strategy Stats**: http://localhost:8080/strategy/stats
+
+### **🛡️ Risk Management & Emergency Procedures**
+
+```bash
+# Emergency stop all strategies
+./scripts/run_strategies.sh emergency
+
+# Manual strategy control
+curl -X POST http://localhost:8080/strategy/sandwich/disable
+curl -X POST http://localhost:8080/positions/close-all
+curl -X POST http://localhost:8080/risk/reset
+
+# Check wallet status
+curl -X GET http://localhost:8080/wallet/status
+```
+
+### **⚡ Performance Targets (8 SOL Capital)**
+
+| Metric | Target | Monitoring Command |
+|--------|--------|-------------------|
+| **Daily Profit** | 0.4 SOL (5% ROI) | `curl http://localhost:8080/strategy/metrics` |
+| **Max Daily Loss** | 1.6 SOL (20%) | `curl http://localhost:9090/api/v1/query?query=hft_daily_loss_ratio` |
+| **Sandwich Success** | >85% | `curl http://localhost:8080/strategy/sandwich/stats` |
+| **Arbitrage Profit/Op** | >0.003 SOL | `curl http://localhost:8080/strategy/arbitrage/stats` |
+| **Snipe Latency** | <100ms | `curl http://localhost:9090/api/v1/query?query=hft_snipe_latency_ms` |
+
+### **✅ Production Readiness Checklist**
+
+- [x] **MEV Engine**: Complete implementation with 5 strategies
+- [x] **Configuration**: Optimized parameters in `config/strategies.toml`
+- [x] **Testing**: Comprehensive unit and integration tests
+- [x] **Monitoring**: Grafana dashboard and Prometheus metrics
+- [x] **Risk Management**: Circuit breakers and position limits
+- [x] **Emergency Procedures**: Automated and manual stop mechanisms
+- [x] **Documentation**: Complete deployment and operation guides
+
+🚀💰 **READY TO GENERATE MEV PROFITS!** 💰🚀

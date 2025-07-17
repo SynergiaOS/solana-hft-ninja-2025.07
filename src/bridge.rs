@@ -46,11 +46,17 @@ pub enum EventType {
 /// Initialize the bridge communication channel
 pub fn init_bridge() -> broadcast::Receiver<Arc<BridgeEvent>> {
     let (tx, rx) = broadcast::channel(1024);
-    
+
     if BRIDGE_CHANNEL.set(tx).is_err() {
-        panic!("Bridge already initialized");
+        // Bridge already initialized, return a new subscriber
+        warn!("Bridge already initialized, returning new subscriber");
+        return subscribe_to_bridge().unwrap_or_else(|_| {
+            // This should never happen, but just in case
+            let (new_tx, new_rx) = broadcast::channel(1024);
+            new_rx
+        });
     }
-    
+
     info!("🌉 Bridge initialized - mempool ↔ engine communication ready");
     rx
 }

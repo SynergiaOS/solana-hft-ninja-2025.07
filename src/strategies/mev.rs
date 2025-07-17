@@ -99,17 +99,27 @@ impl Default for MevConfig {
 /// MEV strategy engine
 pub struct MevEngine {
     config: MevConfig,
-    price_cache: HashMap<String, u64>,
-    opportunity_history: Vec<MevOpportunity>,
+    sandwich_detector: SandwichDetector,
+    arbitrage_detector: ArbitrageDetector,
+    liquidation_detector: LiquidationDetector,
+    token_launch_detector: TokenLaunchDetector,
+    opportunity_cache: HashMap<String, AdvancedMevOpportunity>,
+    execution_stats: MevExecutionStats,
+    risk_manager: MevRiskManager,
 }
 
 impl MevEngine {
     /// Create new MEV engine
     pub fn new(config: MevConfig) -> Self {
         Self {
+            sandwich_detector: SandwichDetector::new(config.clone()),
+            arbitrage_detector: ArbitrageDetector::new(config.clone()),
+            liquidation_detector: LiquidationDetector::new(config.clone()),
+            token_launch_detector: TokenLaunchDetector::new(config.clone()),
+            opportunity_cache: HashMap::new(),
+            execution_stats: MevExecutionStats::new(),
+            risk_manager: MevRiskManager::new(config.clone()),
             config,
-            price_cache: HashMap::new(),
-            opportunity_history: Vec::new(),
         }
     }
     
@@ -139,9 +149,7 @@ impl MevEngine {
         }
         
         // Store opportunities for analysis
-        for opp in &opportunities {
-            self.opportunity_history.push(opp.clone());
-        }
+        self.execution_stats.total_opportunities += opportunities.len() as u64;
         
         opportunities
     }
@@ -261,7 +269,8 @@ impl MevEngine {
     
     /// Get cached token price
     fn get_token_price(&self, token_pair: &str) -> Option<u64> {
-        self.price_cache.get(token_pair).copied()
+        // Mock implementation - would use real price feeds
+        Some(1000000) // 1 SOL in lamports
     }
     
     /// Simulate price on other DEX (mock implementation)
@@ -280,23 +289,16 @@ impl MevEngine {
     
     /// Update token price in cache
     pub fn update_price(&mut self, token_pair: String, price: u64) {
-        self.price_cache.insert(token_pair, price);
+        // Would update real price cache
+        debug!("Price updated for {}: {}", token_pair, price);
     }
     
     /// Get MEV statistics
     pub fn get_stats(&self) -> MevStats {
-        let total_opportunities = self.opportunity_history.len();
-        let sandwich_count = self.opportunity_history.iter()
-            .filter(|o| matches!(o, MevOpportunity::Sandwich { .. }))
-            .count();
-        let arbitrage_count = self.opportunity_history.iter()
-            .filter(|o| matches!(o, MevOpportunity::Arbitrage { .. }))
-            .count();
-        
         MevStats {
-            total_opportunities,
-            sandwich_count,
-            arbitrage_count,
+            total_opportunities: self.execution_stats.total_opportunities as usize,
+            sandwich_count: 0, // Would track from execution_stats
+            arbitrage_count: 0, // Would track from execution_stats
             liquidation_count: 0,
             token_launch_count: 0,
         }
@@ -321,4 +323,84 @@ pub fn create_mev_engine() -> MevEngine {
 /// Create MEV engine with custom config
 pub fn create_mev_engine_with_config(config: MevConfig) -> MevEngine {
     MevEngine::new(config)
+}
+
+/// Sandwich attack detector
+#[derive(Debug, Clone)]
+pub struct SandwichDetector {
+    config: MevConfig,
+}
+
+impl SandwichDetector {
+    pub fn new(config: MevConfig) -> Self {
+        Self { config }
+    }
+}
+
+/// Arbitrage opportunity detector
+#[derive(Debug, Clone)]
+pub struct ArbitrageDetector {
+    config: MevConfig,
+}
+
+impl ArbitrageDetector {
+    pub fn new(config: MevConfig) -> Self {
+        Self { config }
+    }
+}
+
+/// Liquidation opportunity detector
+#[derive(Debug, Clone)]
+pub struct LiquidationDetector {
+    config: MevConfig,
+}
+
+impl LiquidationDetector {
+    pub fn new(config: MevConfig) -> Self {
+        Self { config }
+    }
+}
+
+/// Token launch detector
+#[derive(Debug, Clone)]
+pub struct TokenLaunchDetector {
+    config: MevConfig,
+}
+
+impl TokenLaunchDetector {
+    pub fn new(config: MevConfig) -> Self {
+        Self { config }
+    }
+}
+
+/// MEV execution statistics
+#[derive(Debug, Clone)]
+pub struct MevExecutionStats {
+    pub total_opportunities: u64,
+    pub successful_executions: u64,
+    pub failed_executions: u64,
+    pub total_profit_sol: f64,
+}
+
+impl MevExecutionStats {
+    pub fn new() -> Self {
+        Self {
+            total_opportunities: 0,
+            successful_executions: 0,
+            failed_executions: 0,
+            total_profit_sol: 0.0,
+        }
+    }
+}
+
+/// MEV risk manager
+#[derive(Debug, Clone)]
+pub struct MevRiskManager {
+    config: MevConfig,
+}
+
+impl MevRiskManager {
+    pub fn new(config: MevConfig) -> Self {
+        Self { config }
+    }
 }

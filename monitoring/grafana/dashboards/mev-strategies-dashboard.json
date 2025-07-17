@@ -1,0 +1,322 @@
+{
+  "dashboard": {
+    "id": null,
+    "title": "🥷 Solana HFT Ninja - MEV Strategies Dashboard",
+    "tags": ["solana", "hft", "mev", "strategies"],
+    "style": "dark",
+    "timezone": "browser",
+    "panels": [
+      {
+        "id": 1,
+        "title": "🥪 Sandwich Strategy Performance",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "hft_sandwich_opportunities_total",
+            "legendFormat": "Total Opportunities"
+          },
+          {
+            "expr": "rate(hft_sandwich_successful_total[5m]) * 60",
+            "legendFormat": "Success Rate/min"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "short",
+            "thresholds": {
+              "steps": [
+                {"color": "red", "value": 0},
+                {"color": "yellow", "value": 5},
+                {"color": "green", "value": 10}
+              ]
+            }
+          }
+        },
+        "gridPos": {"h": 8, "w": 6, "x": 0, "y": 0}
+      },
+      {
+        "id": 2,
+        "title": "⚖️ Arbitrage Strategy Performance",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "hft_arbitrage_opportunities_total",
+            "legendFormat": "Total Opportunities"
+          },
+          {
+            "expr": "hft_arbitrage_profit_sol",
+            "legendFormat": "Total Profit (SOL)"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "short",
+            "thresholds": {
+              "steps": [
+                {"color": "red", "value": 0},
+                {"color": "yellow", "value": 0.1},
+                {"color": "green", "value": 0.5}
+              ]
+            }
+          }
+        },
+        "gridPos": {"h": 8, "w": 6, "x": 6, "y": 0}
+      },
+      {
+        "id": 3,
+        "title": "🚀 Token Launch Sniping",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "hft_sniping_opportunities_total",
+            "legendFormat": "Launch Opportunities"
+          },
+          {
+            "expr": "hft_sniping_success_rate",
+            "legendFormat": "Success Rate"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "percent",
+            "max": 100,
+            "thresholds": {
+              "steps": [
+                {"color": "red", "value": 0},
+                {"color": "yellow", "value": 60},
+                {"color": "green", "value": 85}
+              ]
+            }
+          }
+        },
+        "gridPos": {"h": 8, "w": 6, "x": 12, "y": 0}
+      },
+      {
+        "id": 4,
+        "title": "💧 Liquidation Strategy",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "hft_liquidation_opportunities_total",
+            "legendFormat": "Liquidation Opportunities"
+          },
+          {
+            "expr": "hft_liquidation_profit_sol",
+            "legendFormat": "Liquidation Profit (SOL)"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "short",
+            "thresholds": {
+              "steps": [
+                {"color": "red", "value": 0},
+                {"color": "yellow", "value": 0.02},
+                {"color": "green", "value": 0.1}
+              ]
+            }
+          }
+        },
+        "gridPos": {"h": 8, "w": 6, "x": 18, "y": 0}
+      },
+      {
+        "id": 5,
+        "title": "📈 Total MEV Profit Over Time",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "hft_mev_profit_sol",
+            "legendFormat": "Total MEV Profit (SOL)"
+          },
+          {
+            "expr": "hft_sandwich_profit_sol",
+            "legendFormat": "Sandwich Profit"
+          },
+          {
+            "expr": "hft_arbitrage_profit_sol",
+            "legendFormat": "Arbitrage Profit"
+          },
+          {
+            "expr": "hft_liquidation_profit_sol",
+            "legendFormat": "Liquidation Profit"
+          }
+        ],
+        "yAxes": [
+          {
+            "unit": "short",
+            "label": "SOL"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 8}
+      },
+      {
+        "id": 6,
+        "title": "⚡ Strategy Execution Latency",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.95, hft_strategy_execution_seconds_bucket{strategy=\"sandwich\"})",
+            "legendFormat": "Sandwich 95th percentile"
+          },
+          {
+            "expr": "histogram_quantile(0.95, hft_strategy_execution_seconds_bucket{strategy=\"arbitrage\"})",
+            "legendFormat": "Arbitrage 95th percentile"
+          },
+          {
+            "expr": "histogram_quantile(0.95, hft_strategy_execution_seconds_bucket{strategy=\"sniping\"})",
+            "legendFormat": "Sniping 95th percentile"
+          }
+        ],
+        "yAxes": [
+          {
+            "unit": "s",
+            "label": "Seconds"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 8}
+      },
+      {
+        "id": 7,
+        "title": "🎯 Strategy Success Rates",
+        "type": "piechart",
+        "targets": [
+          {
+            "expr": "hft_sandwich_successful_total",
+            "legendFormat": "Sandwich Success"
+          },
+          {
+            "expr": "hft_arbitrage_successful_total",
+            "legendFormat": "Arbitrage Success"
+          },
+          {
+            "expr": "hft_sniping_successful_total",
+            "legendFormat": "Sniping Success"
+          },
+          {
+            "expr": "hft_liquidation_successful_total",
+            "legendFormat": "Liquidation Success"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 8, "x": 0, "y": 16}
+      },
+      {
+        "id": 8,
+        "title": "🔥 MEV Opportunity Heatmap",
+        "type": "heatmap",
+        "targets": [
+          {
+            "expr": "increase(hft_mev_opportunities_found_total[1m])",
+            "legendFormat": "Opportunities per minute"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 8, "x": 8, "y": 16}
+      },
+      {
+        "id": 9,
+        "title": "💰 Risk Management Metrics",
+        "type": "table",
+        "targets": [
+          {
+            "expr": "hft_daily_loss_ratio",
+            "legendFormat": "Daily Loss Ratio"
+          },
+          {
+            "expr": "hft_position_utilization",
+            "legendFormat": "Position Utilization"
+          },
+          {
+            "expr": "hft_circuit_breaker_state",
+            "legendFormat": "Circuit Breaker State"
+          },
+          {
+            "expr": "hft_consecutive_failures",
+            "legendFormat": "Consecutive Failures"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 8, "x": 16, "y": 16}
+      },
+      {
+        "id": 10,
+        "title": "📡 DEX Activity Distribution",
+        "type": "bargauge",
+        "targets": [
+          {
+            "expr": "hft_dex_transactions_total{dex=\"raydium\"}",
+            "legendFormat": "Raydium"
+          },
+          {
+            "expr": "hft_dex_transactions_total{dex=\"orca\"}",
+            "legendFormat": "Orca"
+          },
+          {
+            "expr": "hft_dex_transactions_total{dex=\"jupiter\"}",
+            "legendFormat": "Jupiter"
+          },
+          {
+            "expr": "hft_dex_transactions_total{dex=\"serum\"}",
+            "legendFormat": "Serum"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "short",
+            "displayMode": "gradient"
+          }
+        },
+        "gridPos": {"h": 6, "w": 12, "x": 0, "y": 24}
+      },
+      {
+        "id": 11,
+        "title": "🚨 Alert Status",
+        "type": "alertlist",
+        "targets": [],
+        "gridPos": {"h": 6, "w": 12, "x": 12, "y": 24}
+      }
+    ],
+    "time": {
+      "from": "now-1h",
+      "to": "now"
+    },
+    "refresh": "5s",
+    "annotations": {
+      "list": [
+        {
+          "name": "Strategy Deployments",
+          "datasource": "prometheus",
+          "enable": true,
+          "expr": "changes(hft_strategy_deployments_total[1m])",
+          "iconColor": "green",
+          "titleFormat": "Strategy Deployed"
+        },
+        {
+          "name": "Circuit Breaker Events",
+          "datasource": "prometheus", 
+          "enable": true,
+          "expr": "changes(hft_circuit_breaker_state[1m])",
+          "iconColor": "red",
+          "titleFormat": "Circuit Breaker Triggered"
+        }
+      ]
+    },
+    "templating": {
+      "list": [
+        {
+          "name": "strategy",
+          "type": "query",
+          "query": "label_values(hft_strategy_execution_seconds_bucket, strategy)",
+          "refresh": 1,
+          "includeAll": true,
+          "multi": true
+        },
+        {
+          "name": "dex",
+          "type": "query", 
+          "query": "label_values(hft_dex_transactions_total, dex)",
+          "refresh": 1,
+          "includeAll": true,
+          "multi": true
+        }
+      ]
+    }
+  }
+}
