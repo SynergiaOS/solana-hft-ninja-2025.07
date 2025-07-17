@@ -1,0 +1,169 @@
+groups:
+  - name: hft_alerts
+    rules:
+      # High Latency Alert
+      - alert: HighTransactionLatency
+        expr: hft_transaction_latency_ms > 100
+        for: 2m
+        labels:
+          severity: warning
+          service: hft-ninja
+        annotations:
+          summary: "High transaction latency detected"
+          description: "Transaction latency is {{ $value }}ms, which is above the 100ms threshold"
+
+      # Circuit Breaker Open
+      - alert: CircuitBreakerOpen
+        expr: hft_circuit_breaker_state == 1
+        for: 0m
+        labels:
+          severity: critical
+          service: hft-ninja
+        annotations:
+          summary: "Circuit breaker is OPEN"
+          description: "Trading has been halted due to circuit breaker activation"
+
+      # Wallet Locked
+      - alert: WalletLocked
+        expr: hft_wallet_locked == 1
+        for: 0m
+        labels:
+          severity: critical
+          service: hft-ninja
+        annotations:
+          summary: "Wallet is locked"
+          description: "Trading wallet has been locked for security reasons"
+
+      # High Daily Loss
+      - alert: HighDailyLoss
+        expr: hft_daily_loss_ratio > 0.8
+        for: 1m
+        labels:
+          severity: warning
+          service: hft-ninja
+        annotations:
+          summary: "Daily loss limit approaching"
+          description: "Daily loss ratio is {{ $value | humanizePercentage }}, approaching the limit"
+
+      # Daily Loss Limit Exceeded
+      - alert: DailyLossLimitExceeded
+        expr: hft_daily_loss_ratio >= 1.0
+        for: 0m
+        labels:
+          severity: critical
+          service: hft-ninja
+        annotations:
+          summary: "Daily loss limit exceeded"
+          description: "Daily loss limit has been exceeded, trading should be halted"
+
+      # High Position Utilization
+      - alert: HighPositionUtilization
+        expr: hft_position_utilization > 0.9
+        for: 5m
+        labels:
+          severity: warning
+          service: hft-ninja
+        annotations:
+          summary: "High position utilization"
+          description: "Position utilization is {{ $value | humanizePercentage }}, approaching the limit"
+
+      # Low Transaction Success Rate
+      - alert: LowTransactionSuccessRate
+        expr: rate(hft_transactions_total{status="success"}[5m]) / rate(hft_transactions_total[5m]) < 0.8
+        for: 5m
+        labels:
+          severity: warning
+          service: hft-ninja
+        annotations:
+          summary: "Low transaction success rate"
+          description: "Transaction success rate is {{ $value | humanizePercentage }} over the last 5 minutes"
+
+      # High Failed Login Rate
+      - alert: HighFailedLoginRate
+        expr: rate(hft_security_events_total{type="failed_login"}[5m]) * 60 > 10
+        for: 2m
+        labels:
+          severity: warning
+          service: hft-ninja
+        annotations:
+          summary: "High failed login rate"
+          description: "{{ $value }} failed login attempts per minute detected"
+
+      # Emergency Event
+      - alert: EmergencyEvent
+        expr: increase(hft_security_events_total{type="emergency"}[1m]) > 0
+        for: 0m
+        labels:
+          severity: critical
+          service: hft-ninja
+        annotations:
+          summary: "Emergency event detected"
+          description: "An emergency security event has been triggered"
+
+      # Service Down
+      - alert: HFTServiceDown
+        expr: up{job="hft-ninja"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          service: hft-ninja
+        annotations:
+          summary: "HFT service is down"
+          description: "The HFT Ninja service is not responding"
+
+      # High Memory Usage
+      - alert: HighMemoryUsage
+        expr: (process_resident_memory_bytes{job="hft-ninja"} / 1024 / 1024) > 1500
+        for: 5m
+        labels:
+          severity: warning
+          service: hft-ninja
+        annotations:
+          summary: "High memory usage"
+          description: "Memory usage is {{ $value }}MB, which is above the 1.5GB threshold"
+
+      # High CPU Usage
+      - alert: HighCPUUsage
+        expr: rate(process_cpu_seconds_total{job="hft-ninja"}[5m]) * 100 > 80
+        for: 5m
+        labels:
+          severity: warning
+          service: hft-ninja
+        annotations:
+          summary: "High CPU usage"
+          description: "CPU usage is {{ $value }}%, which is above the 80% threshold"
+
+  - name: infrastructure_alerts
+    rules:
+      # Prometheus Down
+      - alert: PrometheusDown
+        expr: up{job="prometheus"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          service: monitoring
+        annotations:
+          summary: "Prometheus is down"
+          description: "Prometheus monitoring service is not responding"
+
+      # High Disk Usage
+      - alert: HighDiskUsage
+        expr: (node_filesystem_size_bytes{fstype!="tmpfs"} - node_filesystem_free_bytes{fstype!="tmpfs"}) / node_filesystem_size_bytes{fstype!="tmpfs"} > 0.85
+        for: 5m
+        labels:
+          severity: warning
+          service: infrastructure
+        annotations:
+          summary: "High disk usage"
+          description: "Disk usage is {{ $value | humanizePercentage }} on {{ $labels.device }}"
+
+      # Redis Down
+      - alert: RedisDown
+        expr: up{job="redis"} == 0
+        for: 1m
+        labels:
+          severity: warning
+          service: infrastructure
+        annotations:
+          summary: "Redis is down"
+          description: "Redis cache service is not responding"

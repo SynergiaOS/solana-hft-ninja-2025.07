@@ -47,6 +47,16 @@ pub struct HftMetrics {
     pub cpu_usage_percent: Gauge,
     pub active_connections: IntGauge,
     pub error_rate: Gauge,
+
+    // Security metrics
+    pub circuit_breaker_state: IntGauge,
+    pub wallet_locked: IntGauge,
+    pub daily_loss_ratio: Gauge,
+    pub position_utilization: Gauge,
+    pub consecutive_failures: IntGauge,
+    pub security_events_total: IntCounter,
+    pub failed_logins_total: IntCounter,
+    pub emergency_events_total: IntCounter,
     
     // Jito metrics
     pub bundles_submitted: IntCounter,
@@ -207,7 +217,48 @@ impl HftMetrics {
             "hft_tip_amount_sol",
             "Current tip amount in SOL"
         )?;
-        
+
+        // Security metrics
+        let circuit_breaker_state = register_int_gauge!(
+            "hft_circuit_breaker_state",
+            "Circuit breaker state (0=closed, 1=open, 2=half-open)"
+        )?;
+
+        let wallet_locked = register_int_gauge!(
+            "hft_wallet_locked",
+            "Wallet lock status (0=unlocked, 1=locked)"
+        )?;
+
+        let daily_loss_ratio = register_gauge!(
+            "hft_daily_loss_ratio",
+            "Daily loss ratio (0.0-1.0)"
+        )?;
+
+        let position_utilization = register_gauge!(
+            "hft_position_utilization",
+            "Position utilization ratio (0.0-1.0)"
+        )?;
+
+        let consecutive_failures = register_int_gauge!(
+            "hft_consecutive_failures",
+            "Number of consecutive failures"
+        )?;
+
+        let security_events_total = register_int_counter!(
+            "hft_security_events_total",
+            "Total number of security events"
+        )?;
+
+        let failed_logins_total = register_int_counter!(
+            "hft_failed_logins_total",
+            "Total number of failed login attempts"
+        )?;
+
+        let emergency_events_total = register_int_counter!(
+            "hft_emergency_events_total",
+            "Total number of emergency events"
+        )?;
+
         Ok(Self {
             transactions_processed,
             transactions_failed,
@@ -236,6 +287,14 @@ impl HftMetrics {
             bundles_failed,
             bundle_confirmation_time,
             tip_amount_sol,
+            circuit_breaker_state,
+            wallet_locked,
+            daily_loss_ratio,
+            position_utilization,
+            consecutive_failures,
+            security_events_total,
+            failed_logins_total,
+            emergency_events_total,
             registry,
         })
     }
@@ -285,6 +344,46 @@ impl HftMetrics {
         Ok(25.0) // 25%
     }
     
+    /// Update circuit breaker state
+    pub fn update_circuit_breaker_state(&self, state: i64) {
+        self.circuit_breaker_state.set(state);
+    }
+
+    /// Update wallet lock status
+    pub fn update_wallet_locked(&self, locked: bool) {
+        self.wallet_locked.set(if locked { 1 } else { 0 });
+    }
+
+    /// Update daily loss ratio
+    pub fn update_daily_loss_ratio(&self, ratio: f64) {
+        self.daily_loss_ratio.set(ratio);
+    }
+
+    /// Update position utilization
+    pub fn update_position_utilization(&self, ratio: f64) {
+        self.position_utilization.set(ratio);
+    }
+
+    /// Update consecutive failures
+    pub fn update_consecutive_failures(&self, count: i64) {
+        self.consecutive_failures.set(count);
+    }
+
+    /// Record security event
+    pub fn record_security_event(&self) {
+        self.security_events_total.inc();
+    }
+
+    /// Record failed login
+    pub fn record_failed_login(&self) {
+        self.failed_logins_total.inc();
+    }
+
+    /// Record emergency event
+    pub fn record_emergency_event(&self) {
+        self.emergency_events_total.inc();
+    }
+
     /// Export metrics in Prometheus format
     pub fn export_metrics(&self) -> Result<String> {
         let encoder = TextEncoder::new();
