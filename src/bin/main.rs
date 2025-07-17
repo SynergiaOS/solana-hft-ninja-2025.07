@@ -66,14 +66,19 @@ async fn main() -> Result<()> {
 async fn start_enhanced_mempool_listener() -> Result<tokio::task::JoinHandle<()>> {
     let (tx, mut rx) = mpsc::unbounded_channel();
 
-    // Configure Helius connection
-    let config = HeliusConfig {
-        api_key: std::env::var("HELIUS_KEY")
-            .expect("HELIUS_KEY environment variable must be set"),
-        endpoint: "wss://mainnet.helius-rpc.com".to_string(),
-        commitment: CommitmentLevel::Processed,
-        max_reconnect_attempts: 10,
-        reconnect_delay_ms: 1000,
+    // Configure Helius connection (fallback to demo mode if no API key)
+    let config = if let Ok(api_key) = std::env::var("HELIUS_KEY") {
+        info!("🔑 Using Helius API key for real data");
+        crate::mempool::helius::HeliusConfig {
+            api_key,
+            endpoint: "wss://mainnet.helius-rpc.com".to_string(),
+            reconnect_interval: std::time::Duration::from_secs(5),
+            ping_interval: std::time::Duration::from_secs(30),
+            max_reconnect_attempts: 10,
+        }
+    } else {
+        warn!("⚠️  No HELIUS_KEY found, using demo mode");
+        crate::mempool::helius::HeliusConfig::default()
     };
 
     // Create metrics and parser

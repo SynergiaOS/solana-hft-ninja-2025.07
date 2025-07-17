@@ -11,6 +11,10 @@ repository = "https://github.com/hftninja/solana-hft-ninja-2025.07"
 name = "hft-ninja"
 path = "src/bin/main.rs"
 
+[[bin]]
+name = "helius-hft"
+path = "src/bin/helius_main.rs"
+
 [dependencies]
 # Solana
 solana-client = "1.18.26"
