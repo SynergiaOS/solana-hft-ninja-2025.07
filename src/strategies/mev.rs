@@ -48,6 +48,26 @@ pub enum MevOpportunity {
     },
 }
 
+/// Advanced MEV opportunity structure
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AdvancedMevOpportunity {
+    pub opportunity_id: String,
+    pub strategy_type: AdvancedMevStrategyType,
+    pub target_transaction: String,
+    pub estimated_profit_sol: f64,
+    pub confidence_score: f64,
+    pub time_sensitive: bool,
+    pub execution_deadline: u64,
+}
+
+/// Advanced MEV strategy types
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum AdvancedMevStrategyType {
+    SandwichAttack,
+    Arbitrage,
+    Liquidation,
+}
+
 /// MEV strategy configuration
 #[derive(Debug, Clone)]
 pub struct MevConfig {
