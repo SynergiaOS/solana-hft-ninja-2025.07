@@ -1,6 +1,6 @@
 use anyhow::Result;
 use clap::Parser;
-use solana_hft_ninja::{config::Config, engine::Engine, mempool::*, mempool::listener::HeliusConfig};
+use solana_hft_ninja::{config::Config, engine::Engine, mempool::*, mempool::listener::{HeliusConfig, CommitmentLevel}};
 use tokio::sync::mpsc;
 use tracing::{info, error, warn};
 use std::sync::Arc;
@@ -69,16 +69,16 @@ async fn start_enhanced_mempool_listener() -> Result<tokio::task::JoinHandle<()>
     // Configure Helius connection (fallback to demo mode if no API key)
     let config = if let Ok(api_key) = std::env::var("HELIUS_KEY") {
         info!("🔑 Using Helius API key for real data");
-        crate::mempool::helius::HeliusConfig {
+        HeliusConfig {
             api_key,
             endpoint: "wss://mainnet.helius-rpc.com".to_string(),
-            reconnect_interval: std::time::Duration::from_secs(5),
-            ping_interval: std::time::Duration::from_secs(30),
+            commitment: CommitmentLevel::Processed,
             max_reconnect_attempts: 10,
+            reconnect_delay_ms: 5000,
         }
     } else {
         warn!("⚠️  No HELIUS_KEY found, using demo mode");
-        crate::mempool::helius::HeliusConfig::default()
+        HeliusConfig::default()
     };
 
     // Create metrics and parser

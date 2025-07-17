@@ -10,6 +10,7 @@ pub mod types;
 pub mod utils;
 pub mod bridge;
 pub mod simple_engine;
+pub mod security;
 pub mod engine;
 
 pub use config::Config;
