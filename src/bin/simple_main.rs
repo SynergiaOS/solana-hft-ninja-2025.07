@@ -4,7 +4,7 @@
 
 use anyhow::Result;
 use clap::Parser;
-use solana_hft_ninja::{config::Config, bridge::*, simple_engine::*};
+use solana_hft_ninja::{config::Config, bridge::*, simple_engine::*, monitoring::{create_metrics, start_metrics_collection, MetricsServer}};
 use tracing::{info, error, warn};
 
 #[derive(Parser, Debug)]
@@ -34,21 +34,55 @@ async fn main() -> Result<()> {
     let args = Args::parse();
     
     // Load configuration (with fallback)
+    info!("📁 Loading configuration from: {}", args.config_path);
     let config = match Config::load(&args.config_path) {
-        Ok(config) => config,
+        Ok(config) => {
+            info!("✅ Configuration loaded successfully");
+            config
+        },
         Err(e) => {
             warn!("Failed to load config: {}, using defaults", e);
             create_default_config()
         }
     };
+
+    info!("🔧 Configuration:");
+    info!("   - RPC URL: {}", config.solana.rpc_url);
+    info!("   - Wallet path: {}", config.wallet.keypair_path);
     
     // Initialize bridge
     let bridge_rx = init_bridge();
     info!("🌉 Bridge initialized successfully");
     
+    // Initialize metrics
+    info!("📊 Initializing metrics system...");
+    let metrics = create_metrics()?;
+    let metrics_server = MetricsServer::new(metrics.clone(), 8080);
+
+    // Start metrics collection
+    let metrics_clone = metrics.clone();
+    tokio::spawn(async move {
+        start_metrics_collection(metrics_clone).await;
+    });
+
+    // Start metrics server
+    let metrics_server_clone = metrics_server;
+    tokio::spawn(async move {
+        if let Err(e) = metrics_server_clone.start().await {
+            error!("Failed to start metrics server: {}", e);
+        }
+    });
+
     // Initialize simple engine
+    info!("🏗️  Creating HFT Engine...");
     let mut engine = SimpleEngine::new(config, args.dry_run).await?;
-    info!("⚙️  Simple engine initialized");
+
+    // Set metrics in engine
+    engine.set_metrics(metrics.clone());
+
+    info!("✅ Engine created successfully");
+    info!("🔑 Wallet: {}", engine.wallet_pubkey());
+    info!("📊 Metrics server started on http://localhost:8080/metrics");
     
     // Start mempool listener if enabled
     let mempool_handle = if args.enable_mempool {

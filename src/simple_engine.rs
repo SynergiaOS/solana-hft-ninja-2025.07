@@ -2,7 +2,7 @@
 //! 
 //! A minimal working implementation of the HFT engine with mempool bridge.
 
-use crate::{config::Config, market::MarketData, strategy::Strategy, bridge::*};
+use crate::{config::Config, market::MarketData, strategy::Strategy, bridge::*, core::WalletManager, monitoring::HftMetrics};
 use anyhow::Result;
 use tokio::sync::broadcast;
 use std::sync::Arc;
@@ -14,9 +14,11 @@ pub struct SimpleEngine {
     config: Config,
     market_data: MarketData,
     strategy: Box<dyn Strategy>,
+    wallet: WalletManager,
     dry_run: bool,
     event_processor: SimpleEventProcessor,
     stats: EngineStats,
+    metrics: Option<Arc<HftMetrics>>,
 }
 
 /// Engine statistics
@@ -35,15 +37,26 @@ impl SimpleEngine {
         let market_data = MarketData::new(&config.solana).await?;
         let strategy = crate::strategy::create_strategy(&config.strategy)?;
         let event_processor = SimpleEventProcessor::new();
-        
+
+        // Initialize wallet
+        let wallet = WalletManager::from_file(&config.wallet.keypair_path)?;
+        info!("🔑 Wallet loaded: {}", wallet.pubkey());
+
         Ok(Self {
             config,
             market_data,
             strategy,
+            wallet,
             dry_run,
             event_processor,
             stats: EngineStats::default(),
+            metrics: None,
         })
+    }
+
+    /// Set metrics instance
+    pub fn set_metrics(&mut self, metrics: Arc<HftMetrics>) {
+        self.metrics = Some(metrics);
     }
 
     /// Run engine with bridge integration
@@ -70,13 +83,24 @@ impl SimpleEngine {
                         Ok(result) => {
                             let latency = processing_start.elapsed();
                             self.stats.events_processed += 1;
-                            
+
+                            // Record metrics
+                            if let Some(ref metrics) = self.metrics {
+                                metrics.transactions_processed.inc();
+                                metrics.record_transaction_processing_time(latency);
+
+                                if result.success {
+                                    metrics.mev_opportunities_found.inc();
+                                    metrics.total_profit_sol.add(result.profit_estimate);
+                                }
+                            }
+
                             if result.success {
                                 self.stats.opportunities_found += 1;
                                 self.stats.total_profit_sol += result.profit_estimate;
-                                
+
                                 info!(
-                                    "✅ Event processed in {:?} - {} (Profit: {:.6} SOL)", 
+                                    "✅ Event processed in {:?} - {} (Profit: {:.6} SOL)",
                                     latency,
                                     result.action_taken,
                                     result.profit_estimate
@@ -87,6 +111,9 @@ impl SimpleEngine {
                         }
                         Err(e) => {
                             error!("❌ Event processing failed: {}", e);
+                            if let Some(ref metrics) = self.metrics {
+                                metrics.transactions_failed.inc();
+                            }
                         }
                     }
                 }
@@ -190,6 +217,11 @@ impl SimpleEngine {
     /// Check if engine is in dry run mode
     pub fn is_dry_run(&self) -> bool {
         self.dry_run
+    }
+
+    /// Get wallet public key
+    pub fn wallet_pubkey(&self) -> solana_sdk::pubkey::Pubkey {
+        self.wallet.pubkey()
     }
 
     /// Process event from bridge

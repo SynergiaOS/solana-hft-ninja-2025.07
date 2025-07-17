@@ -4,8 +4,8 @@
 
 use anyhow::Result;
 use prometheus::{
-    Counter, Gauge, Histogram, IntCounter, IntGauge, 
-    register_counter, register_gauge, register_histogram, 
+    Counter, Gauge, Histogram, IntCounter, IntGauge, HistogramOpts,
+    register_counter, register_gauge, register_histogram,
     register_int_counter, register_int_gauge,
     Encoder, TextEncoder, Registry,
 };
@@ -74,190 +74,229 @@ impl HftMetrics {
         let registry = Registry::new();
         
         // Transaction metrics
-        let transactions_processed = register_int_counter!(
+        let transactions_processed = IntCounter::new(
             "hft_transactions_processed_total",
             "Total number of transactions processed"
         )?;
-        
-        let transactions_failed = register_int_counter!(
+        registry.register(Box::new(transactions_processed.clone()))?;
+
+        let transactions_failed = IntCounter::new(
             "hft_transactions_failed_total",
             "Total number of failed transactions"
         )?;
-        
-        let dex_transactions_detected = register_int_counter!(
+        registry.register(Box::new(transactions_failed.clone()))?;
+
+        let dex_transactions_detected = IntCounter::new(
             "hft_dex_transactions_detected_total",
             "Total number of DEX transactions detected"
         )?;
-        
-        let mev_opportunities_found = register_int_counter!(
+        registry.register(Box::new(dex_transactions_detected.clone()))?;
+
+        let mev_opportunities_found = IntCounter::new(
             "hft_mev_opportunities_found_total",
             "Total number of MEV opportunities found"
         )?;
+        registry.register(Box::new(mev_opportunities_found.clone()))?;
         
         // Performance metrics
-        let transaction_processing_time = register_histogram!(
-            "hft_transaction_processing_seconds",
-            "Time spent processing transactions",
-            vec![0.001, 0.005, 0.01, 0.05, 0.1, 0.5, 1.0, 5.0]
+        let transaction_processing_time = Histogram::with_opts(
+            HistogramOpts::new(
+                "hft_transaction_processing_seconds",
+                "Time spent processing transactions"
+            ).buckets(vec![0.001, 0.005, 0.01, 0.05, 0.1, 0.5, 1.0, 5.0])
         )?;
-        
-        let mempool_latency = register_histogram!(
-            "hft_mempool_latency_seconds",
-            "Latency from mempool to processing",
-            vec![0.001, 0.005, 0.01, 0.05, 0.1, 0.5, 1.0]
+        registry.register(Box::new(transaction_processing_time.clone()))?;
+
+        let mempool_latency = Histogram::with_opts(
+            HistogramOpts::new(
+                "hft_mempool_latency_seconds",
+                "Latency from mempool to processing"
+            ).buckets(vec![0.001, 0.005, 0.01, 0.05, 0.1, 0.5, 1.0])
         )?;
-        
-        let execution_latency = register_histogram!(
-            "hft_execution_latency_seconds",
-            "Trade execution latency",
-            vec![0.01, 0.05, 0.1, 0.5, 1.0, 2.0, 5.0, 10.0]
+        registry.register(Box::new(mempool_latency.clone()))?;
+
+        let execution_latency = Histogram::with_opts(
+            HistogramOpts::new(
+                "hft_execution_latency_seconds",
+                "Trade execution latency"
+            ).buckets(vec![0.01, 0.05, 0.1, 0.5, 1.0, 2.0, 5.0, 10.0])
         )?;
-        
-        let bridge_queue_size = register_int_gauge!(
+        registry.register(Box::new(execution_latency.clone()))?;
+
+        let bridge_queue_size = IntGauge::new(
             "hft_bridge_queue_size",
             "Current size of bridge message queue"
         )?;
+        registry.register(Box::new(bridge_queue_size.clone()))?;
         
         // Trading metrics
-        let trades_executed = register_int_counter!(
+        let trades_executed = IntCounter::new(
             "hft_trades_executed_total",
             "Total number of trades executed"
         )?;
-        
-        let trades_successful = register_int_counter!(
+        registry.register(Box::new(trades_executed.clone()))?;
+
+        let trades_successful = IntCounter::new(
             "hft_trades_successful_total",
             "Total number of successful trades"
         )?;
-        
-        let trades_failed = register_int_counter!(
+        registry.register(Box::new(trades_successful.clone()))?;
+
+        let trades_failed = IntCounter::new(
             "hft_trades_failed_total",
             "Total number of failed trades"
         )?;
-        
-        let total_volume_sol = register_gauge!(
+        registry.register(Box::new(trades_failed.clone()))?;
+
+        let total_volume_sol = Gauge::new(
             "hft_total_volume_sol",
             "Total trading volume in SOL"
         )?;
-        
-        let total_profit_sol = register_gauge!(
+        registry.register(Box::new(total_volume_sol.clone()))?;
+
+        let total_profit_sol = Gauge::new(
             "hft_total_profit_sol",
             "Total profit in SOL"
         )?;
-        
-        let total_loss_sol = register_gauge!(
+        registry.register(Box::new(total_profit_sol.clone()))?;
+
+        let total_loss_sol = Gauge::new(
             "hft_total_loss_sol",
             "Total loss in SOL"
         )?;
+        registry.register(Box::new(total_loss_sol.clone()))?;
         
         // MEV metrics
-        let sandwich_opportunities = register_int_counter!(
+        let sandwich_opportunities = IntCounter::new(
             "hft_sandwich_opportunities_total",
             "Total sandwich opportunities detected"
         )?;
-        
-        let arbitrage_opportunities = register_int_counter!(
+        registry.register(Box::new(sandwich_opportunities.clone()))?;
+
+        let arbitrage_opportunities = IntCounter::new(
             "hft_arbitrage_opportunities_total",
             "Total arbitrage opportunities detected"
         )?;
-        
-        let liquidation_opportunities = register_int_counter!(
+        registry.register(Box::new(arbitrage_opportunities.clone()))?;
+
+        let liquidation_opportunities = IntCounter::new(
             "hft_liquidation_opportunities_total",
             "Total liquidation opportunities detected"
         )?;
-        
-        let mev_profit_sol = register_gauge!(
+        registry.register(Box::new(liquidation_opportunities.clone()))?;
+
+        let mev_profit_sol = Gauge::new(
             "hft_mev_profit_sol",
             "Total MEV profit in SOL"
         )?;
+        registry.register(Box::new(mev_profit_sol.clone()))?;
         
         // System metrics
-        let memory_usage_bytes = register_int_gauge!(
+        let memory_usage_bytes = IntGauge::new(
             "hft_memory_usage_bytes",
             "Current memory usage in bytes"
         )?;
-        
-        let cpu_usage_percent = register_gauge!(
+        registry.register(Box::new(memory_usage_bytes.clone()))?;
+
+        let cpu_usage_percent = Gauge::new(
             "hft_cpu_usage_percent",
             "Current CPU usage percentage"
         )?;
-        
-        let active_connections = register_int_gauge!(
+        registry.register(Box::new(cpu_usage_percent.clone()))?;
+
+        let active_connections = IntGauge::new(
             "hft_active_connections",
             "Number of active connections"
         )?;
-        
-        let error_rate = register_gauge!(
+        registry.register(Box::new(active_connections.clone()))?;
+
+        let error_rate = Gauge::new(
             "hft_error_rate",
             "Current error rate (errors per second)"
         )?;
+        registry.register(Box::new(error_rate.clone()))?;
         
         // Jito metrics
-        let bundles_submitted = register_int_counter!(
+        let bundles_submitted = IntCounter::new(
             "hft_bundles_submitted_total",
             "Total number of Jito bundles submitted"
         )?;
-        
-        let bundles_confirmed = register_int_counter!(
+        registry.register(Box::new(bundles_submitted.clone()))?;
+
+        let bundles_confirmed = IntCounter::new(
             "hft_bundles_confirmed_total",
             "Total number of Jito bundles confirmed"
         )?;
-        
-        let bundles_failed = register_int_counter!(
+        registry.register(Box::new(bundles_confirmed.clone()))?;
+
+        let bundles_failed = IntCounter::new(
             "hft_bundles_failed_total",
             "Total number of Jito bundles failed"
         )?;
-        
-        let bundle_confirmation_time = register_histogram!(
-            "hft_bundle_confirmation_seconds",
-            "Time for bundle confirmation",
-            vec![0.1, 0.5, 1.0, 2.0, 5.0, 10.0, 30.0]
+        registry.register(Box::new(bundles_failed.clone()))?;
+
+        let bundle_confirmation_time = Histogram::with_opts(
+            HistogramOpts::new(
+                "hft_bundle_confirmation_seconds",
+                "Time for bundle confirmation"
+            ).buckets(vec![0.1, 0.5, 1.0, 2.0, 5.0, 10.0, 30.0])
         )?;
-        
-        let tip_amount_sol = register_gauge!(
+        registry.register(Box::new(bundle_confirmation_time.clone()))?;
+
+        let tip_amount_sol = Gauge::new(
             "hft_tip_amount_sol",
             "Current tip amount in SOL"
         )?;
+        registry.register(Box::new(tip_amount_sol.clone()))?;
 
         // Security metrics
-        let circuit_breaker_state = register_int_gauge!(
+        let circuit_breaker_state = IntGauge::new(
             "hft_circuit_breaker_state",
             "Circuit breaker state (0=closed, 1=open, 2=half-open)"
         )?;
+        registry.register(Box::new(circuit_breaker_state.clone()))?;
 
-        let wallet_locked = register_int_gauge!(
+        let wallet_locked = IntGauge::new(
             "hft_wallet_locked",
             "Wallet lock status (0=unlocked, 1=locked)"
         )?;
+        registry.register(Box::new(wallet_locked.clone()))?;
 
-        let daily_loss_ratio = register_gauge!(
+        let daily_loss_ratio = Gauge::new(
             "hft_daily_loss_ratio",
             "Daily loss ratio (0.0-1.0)"
         )?;
+        registry.register(Box::new(daily_loss_ratio.clone()))?;
 
-        let position_utilization = register_gauge!(
+        let position_utilization = Gauge::new(
             "hft_position_utilization",
             "Position utilization ratio (0.0-1.0)"
         )?;
+        registry.register(Box::new(position_utilization.clone()))?;
 
-        let consecutive_failures = register_int_gauge!(
+        let consecutive_failures = IntGauge::new(
             "hft_consecutive_failures",
             "Number of consecutive failures"
         )?;
+        registry.register(Box::new(consecutive_failures.clone()))?;
 
-        let security_events_total = register_int_counter!(
+        let security_events_total = IntCounter::new(
             "hft_security_events_total",
             "Total number of security events"
         )?;
+        registry.register(Box::new(security_events_total.clone()))?;
 
-        let failed_logins_total = register_int_counter!(
+        let failed_logins_total = IntCounter::new(
             "hft_failed_logins_total",
             "Total number of failed login attempts"
         )?;
+        registry.register(Box::new(failed_logins_total.clone()))?;
 
-        let emergency_events_total = register_int_counter!(
+        let emergency_events_total = IntCounter::new(
             "hft_emergency_events_total",
             "Total number of emergency events"
         )?;
+        registry.register(Box::new(emergency_events_total.clone()))?;
 
         Ok(Self {
             transactions_processed,

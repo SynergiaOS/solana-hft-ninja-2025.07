@@ -1,8 +1,8 @@
 # Solana HFT Ninja 2025.07 Configuration
 
 [solana]
-rpc_url = "https://api.mainnet-beta.solana.com"
-ws_url = "wss://api.mainnet-beta.solana.com"
+rpc_url = "https://api.devnet.solana.com"
+ws_url = "wss://api.devnet.solana.com"
 rpc_timeout_ms = 5000
 commitment = "confirmed"
 
@@ -39,8 +39,8 @@ tip_account = "96gYZGLnJYVFmbjzopPSU6QiEV5fGqZNyN9nmNhvrZU5"
 max_tip_lamports = 100000
 
 [wallet]
-private_key_path = ""
-keypair_path = ""
+private_key_path = "./config/wallet.json"
+keypair_path = "./config/wallet.json"
 
 [risk]
 stop_loss_bps = 200
