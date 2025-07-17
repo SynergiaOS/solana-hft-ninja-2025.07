@@ -1,0 +1,97 @@
+version: '3.8'
+
+services:
+  # DragonflyDB - Ultra-fast vector memory store
+  dragonflydb:
+    image: docker.dragonflydb.io/dragonflydb/dragonfly:latest
+    container_name: cerebro-dragonflydb
+    ports:
+      - "6379:6379"
+    volumes:
+      - dragonfly_data:/data
+    command: >
+      dragonfly
+      --logtostderr
+      --alsologtostderr
+      --vmodule=*=1
+      --max_memory=2GB
+      --cache_mode=true
+      --enable_search=true
+    environment:
+      - DFLY_requirepass=cerebro_secure_2025
+    networks:
+      - cerebro-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "cerebro_secure_2025", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  # FastAPI BFF (Backend-for-Frontend)
+  cerebro-bff:
+    build:
+      context: ./bff
+      dockerfile: Dockerfile
+    container_name: cerebro-bff
+    ports:
+      - "8000:8000"
+    environment:
+      - DRAGONFLY_URL=redis://:cerebro_secure_2025@dragonflydb:6379
+      - HFT_NINJA_API_URL=http://host.docker.internal:8080
+      - KESTRA_API_URL=http://kestra:8080
+      - ENVIRONMENT=development
+      - LOG_LEVEL=info
+    depends_on:
+      dragonflydb:
+        condition: service_healthy
+    networks:
+      - cerebro-network
+    restart: unless-stopped
+    volumes:
+      - ./bff:/app
+      - /app/node_modules
+
+  # Kestra Orchestrator
+  kestra:
+    image: kestra/kestra:latest
+    container_name: cerebro-kestra
+    ports:
+      - "8081:8080"
+    environment:
+      - KESTRA_CONFIGURATION_PATH=/app/kestra.yml
+      - KESTRA_PLUGINS_PATH=/app/plugins
+    volumes:
+      - ./kestra/config:/app
+      - ./kestra/flows:/app/flows
+      - kestra_data:/app/storage
+    networks:
+      - cerebro-network
+    restart: unless-stopped
+    depends_on:
+      - dragonflydb
+
+  # Redis Insight for DragonflyDB monitoring
+  redis-insight:
+    image: redislabs/redisinsight:latest
+    container_name: cerebro-redis-insight
+    ports:
+      - "8001:8001"
+    environment:
+      - RIPORT=8001
+    networks:
+      - cerebro-network
+    restart: unless-stopped
+
+volumes:
+  dragonfly_data:
+    driver: local
+  kestra_data:
+    driver: local
+
+networks:
+  cerebro-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.25.0.0/16

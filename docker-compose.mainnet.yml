@@ -1,0 +1,215 @@
+# 🚀 CEREBRO HFT MAINNET PRODUCTION STACK
+# Complete production deployment with all services
+
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15-alpine
+    container_name: cerebro-postgres-mainnet
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: cerebro_mainnet
+      POSTGRES_USER: cerebro
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_INITDB_ARGS: "--encoding=UTF-8 --lc-collate=C --lc-ctype=C"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./database/init:/docker-entrypoint-initdb.d
+    ports:
+      - "5432:5432"
+    networks:
+      - app
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U cerebro -d cerebro_mainnet"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Redis Cache
+  redis:
+    image: redis:7-alpine
+    container_name: cerebro-redis-mainnet
+    restart: unless-stopped
+    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD}
+    volumes:
+      - redis_data:/data
+    ports:
+      - "6379:6379"
+    networks:
+      - app
+    healthcheck:
+      test: ["CMD", "redis-cli", "--raw", "incr", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # DragonflyDB (Vector Memory)
+  dragonflydb:
+    image: docker.dragonflydb.io/dragonflydb/dragonfly:v1.11.0
+    container_name: cerebro-dragonflydb-mainnet
+    restart: unless-stopped
+    command: dragonfly --logtostderr --requirepass=${DRAGONFLY_PASSWORD}
+    volumes:
+      - dragonfly_data:/data
+    ports:
+      - "6380:6379"
+    networks:
+      - app
+    healthcheck:
+      test: ["CMD", "redis-cli", "-p", "6379", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Cerebro Backend API
+  cerebro-api:
+    build:
+      context: ./cerebro/backend
+      dockerfile: Dockerfile.production
+    container_name: cerebro-api-mainnet
+    restart: unless-stopped
+    environment:
+      - NODE_ENV=production
+      - DATABASE_URL=postgresql://cerebro:${POSTGRES_PASSWORD}@postgres:5432/cerebro_mainnet
+      - REDIS_URL=redis://:${REDIS_PASSWORD}@redis:6379
+      - DRAGONFLY_URL=redis://:${DRAGONFLY_PASSWORD}@dragonflydb:6379
+      - SOLANA_NETWORK=mainnet-beta
+      - HELIUS_API_KEY=${HELIUS_API_KEY}
+      - QUICKNODE_ENDPOINT=${QUICKNODE_ENDPOINT}
+      - JWT_SECRET=${JWT_SECRET}
+      - TRADING_ENABLED=false
+    volumes:
+      - ./logs/api:/app/logs
+      - ${WALLET_PRIVATE_KEY_PATH}:/app/wallet.json:ro
+    ports:
+      - "8000:8000"
+    networks:
+      - app
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Cerebro Frontend Dashboard
+  cerebro-dashboard:
+    build:
+      context: ./cerebro/dashboard
+      dockerfile: Dockerfile.production
+    container_name: cerebro-dashboard-mainnet
+    restart: unless-stopped
+    environment:
+      - VITE_API_BASE_URL=http://localhost:8000
+      - VITE_WS_BASE_URL=ws://localhost:8000
+      - VITE_ENVIRONMENT=mainnet
+    ports:
+      - "3001:80"
+    networks:
+      - app
+    depends_on:
+      - cerebro-api
+
+  # HFT Trading Engine (Rust)
+  hft-engine:
+    build:
+      context: .
+      dockerfile: Dockerfile.production
+    container_name: cerebro-hft-mainnet
+    restart: unless-stopped
+    environment:
+      - RUST_LOG=info
+      - SOLANA_NETWORK=mainnet-beta
+      - HELIUS_API_KEY=${HELIUS_API_KEY}
+      - QUICKNODE_ENDPOINT=${QUICKNODE_ENDPOINT}
+      - TRADING_ENABLED=false
+      - MAX_POSITION_SIZE_SOL=${MAX_POSITION_SIZE_SOL}
+      - MAX_DAILY_LOSS_SOL=${MAX_DAILY_LOSS_SOL}
+      - CIRCUIT_BREAKER_ENABLED=true
+    volumes:
+      - ./logs/hft:/app/logs
+      - ${WALLET_PRIVATE_KEY_PATH}:/app/wallet.json:ro
+    ports:
+      - "8080:8080"
+    networks:
+      - app
+    depends_on:
+      - postgres
+      - redis
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Kestra Workflow Engine
+  kestra:
+    image: kestra/kestra:latest
+    container_name: cerebro-kestra-mainnet
+    restart: unless-stopped
+    environment:
+      - KESTRA_CONFIGURATION_PATH=/app/kestra.yml
+      - KESTRA_PLUGINS_PATH=/app/plugins
+    volumes:
+      - ./kestra/kestra.yml:/app/kestra.yml
+      - ./kestra/flows:/app/flows
+      - ./kestra/plugins:/app/plugins
+      - kestra_data:/app/storage
+    ports:
+      - "8081:8080"
+    networks:
+      - app
+    depends_on:
+      - postgres
+      - redis
+
+  # Nginx Reverse Proxy
+  nginx:
+    image: nginx:alpine
+    container_name: cerebro-nginx-mainnet
+    restart: unless-stopped
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf
+      - ./nginx/ssl:/etc/nginx/ssl
+    ports:
+      - "80:80"
+      - "443:443"
+    networks:
+      - app
+    depends_on:
+      - cerebro-dashboard
+      - cerebro-api
+
+  # Log Rotation
+  logrotate:
+    image: linkyard/docker-logrotate
+    container_name: cerebro-logrotate
+    restart: unless-stopped
+    volumes:
+      - ./logs:/logs
+      - ./logrotate/logrotate.conf:/etc/logrotate.conf
+    environment:
+      - LOGS_DIRECTORIES=/logs
+      - LOGROTATE_INTERVAL=daily
+      - LOGROTATE_COPIES=7
+
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+  dragonfly_data:
+    driver: local
+  kestra_data:
+    driver: local
+
+networks:
+  app:
+    driver: bridge
+    name: cerebro_app

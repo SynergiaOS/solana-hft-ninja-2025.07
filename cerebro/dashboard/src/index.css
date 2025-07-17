@@ -1,0 +1,329 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Custom CSS Variables */
+:root {
+  --cerebro-primary: #8b5cf6;
+  --cerebro-secondary: #7c3aed;
+  --profit-color: #22c55e;
+  --loss-color: #ef4444;
+  --warning-color: #f59e0b;
+  --info-color: #3b82f6;
+}
+
+/* Base Styles */
+@layer base {
+  * {
+    @apply border-gray-200;
+  }
+  
+  body {
+    @apply bg-dark-950 text-white font-sans;
+    font-feature-settings: "rlig" 1, "calt" 1;
+  }
+  
+  /* Scrollbar Styles */
+  ::-webkit-scrollbar {
+    @apply w-2;
+  }
+  
+  ::-webkit-scrollbar-track {
+    @apply bg-dark-900;
+  }
+  
+  ::-webkit-scrollbar-thumb {
+    @apply bg-dark-700 rounded-full;
+  }
+  
+  ::-webkit-scrollbar-thumb:hover {
+    @apply bg-dark-600;
+  }
+  
+  /* Selection Styles */
+  ::selection {
+    @apply bg-cerebro-500/30 text-white;
+  }
+  
+  /* Focus Styles */
+  :focus-visible {
+    @apply outline-none ring-2 ring-cerebro-500 ring-offset-2 ring-offset-dark-950;
+  }
+}
+
+/* Component Styles */
+@layer components {
+  /* Card Component */
+  .card {
+    @apply bg-dark-900/50 backdrop-blur-sm border border-dark-800 rounded-xl p-6 shadow-lg;
+  }
+  
+  .card-hover {
+    @apply transition-all duration-200 hover:bg-dark-900/70 hover:border-dark-700 hover:shadow-xl;
+  }
+  
+  /* Button Variants */
+  .btn {
+    @apply inline-flex items-center justify-center rounded-lg font-medium transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-dark-950;
+  }
+  
+  .btn-primary {
+    @apply bg-cerebro-600 text-white hover:bg-cerebro-700 focus:ring-cerebro-500;
+  }
+  
+  .btn-secondary {
+    @apply bg-dark-800 text-white hover:bg-dark-700 focus:ring-dark-500;
+  }
+  
+  .btn-success {
+    @apply bg-profit-600 text-white hover:bg-profit-700 focus:ring-profit-500;
+  }
+  
+  .btn-danger {
+    @apply bg-loss-600 text-white hover:bg-loss-700 focus:ring-loss-500;
+  }
+  
+  .btn-ghost {
+    @apply text-gray-300 hover:text-white hover:bg-dark-800 focus:ring-dark-500;
+  }
+  
+  /* Input Styles */
+  .input {
+    @apply block w-full rounded-lg border border-dark-700 bg-dark-800 px-3 py-2 text-white placeholder-gray-400 focus:border-cerebro-500 focus:ring-cerebro-500 sm:text-sm;
+  }
+  
+  /* Badge Styles */
+  .badge {
+    @apply inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium;
+  }
+  
+  .badge-success {
+    @apply bg-profit-100 text-profit-800;
+  }
+  
+  .badge-danger {
+    @apply bg-loss-100 text-loss-800;
+  }
+  
+  .badge-warning {
+    @apply bg-yellow-100 text-yellow-800;
+  }
+  
+  .badge-info {
+    @apply bg-blue-100 text-blue-800;
+  }
+  
+  .badge-dark {
+    @apply bg-dark-800 text-gray-300;
+  }
+  
+  /* Metric Card */
+  .metric-card {
+    @apply card card-hover;
+  }
+  
+  .metric-value {
+    @apply text-2xl font-bold text-white;
+  }
+  
+  .metric-label {
+    @apply text-sm text-gray-400;
+  }
+  
+  .metric-change {
+    @apply text-sm font-medium;
+  }
+  
+  .metric-change-positive {
+    @apply text-profit-400;
+  }
+  
+  .metric-change-negative {
+    @apply text-loss-400;
+  }
+  
+  /* Chart Container */
+  .chart-container {
+    @apply card p-4;
+  }
+  
+  /* Navigation */
+  .nav-link {
+    @apply flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-colors duration-200;
+  }
+  
+  .nav-link-active {
+    @apply bg-cerebro-600 text-white;
+  }
+  
+  .nav-link-inactive {
+    @apply text-gray-300 hover:text-white hover:bg-dark-800;
+  }
+  
+  /* Table Styles */
+  .table {
+    @apply min-w-full divide-y divide-dark-700;
+  }
+  
+  .table-header {
+    @apply bg-dark-800;
+  }
+  
+  .table-header-cell {
+    @apply px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider;
+  }
+  
+  .table-body {
+    @apply bg-dark-900 divide-y divide-dark-700;
+  }
+  
+  .table-row {
+    @apply hover:bg-dark-800 transition-colors duration-150;
+  }
+  
+  .table-cell {
+    @apply px-6 py-4 whitespace-nowrap text-sm text-gray-300;
+  }
+  
+  /* Status Indicators */
+  .status-online {
+    @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-profit-100 text-profit-800;
+  }
+  
+  .status-offline {
+    @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-loss-100 text-loss-800;
+  }
+  
+  .status-warning {
+    @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800;
+  }
+  
+  /* Loading Spinner */
+  .spinner {
+    @apply animate-spin rounded-full border-2 border-gray-300 border-t-cerebro-600;
+  }
+  
+  /* Glow Effects */
+  .glow-cerebro {
+    @apply shadow-glow;
+  }
+  
+  .glow-profit {
+    box-shadow: 0 0 20px rgba(34, 197, 94, 0.3);
+  }
+  
+  .glow-loss {
+    box-shadow: 0 0 20px rgba(239, 68, 68, 0.3);
+  }
+}
+
+/* Utility Classes */
+@layer utilities {
+  /* Text Gradients */
+  .text-gradient-cerebro {
+    @apply bg-gradient-to-r from-cerebro-400 to-cerebro-600 bg-clip-text text-transparent;
+  }
+  
+  .text-gradient-profit {
+    @apply bg-gradient-to-r from-profit-400 to-profit-600 bg-clip-text text-transparent;
+  }
+  
+  .text-gradient-loss {
+    @apply bg-gradient-to-r from-loss-400 to-loss-600 bg-clip-text text-transparent;
+  }
+  
+  /* Background Gradients */
+  .bg-gradient-cerebro {
+    @apply bg-gradient-to-r from-cerebro-600 to-cerebro-700;
+  }
+  
+  .bg-gradient-dark {
+    @apply bg-gradient-to-br from-dark-900 to-dark-950;
+  }
+  
+  /* Animation Utilities */
+  .animate-fade-in {
+    @apply animate-fade-in;
+  }
+  
+  .animate-slide-up {
+    @apply animate-slide-up;
+  }
+  
+  .animate-pulse-slow {
+    @apply animate-pulse-slow;
+  }
+  
+  /* Layout Utilities */
+  .container-dashboard {
+    @apply max-w-7xl mx-auto px-4 sm:px-6 lg:px-8;
+  }
+  
+  .grid-dashboard {
+    @apply grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6;
+  }
+  
+  .grid-metrics {
+    @apply grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6;
+  }
+}
+
+/* Custom Animations */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Chart Customizations */
+.recharts-cartesian-axis-tick-value {
+  @apply fill-gray-400 text-xs;
+}
+
+.recharts-legend-item-text {
+  @apply text-gray-300 !important;
+}
+
+.recharts-tooltip-wrapper {
+  @apply rounded-lg shadow-lg;
+}
+
+/* React Hot Toast Customizations */
+.toast-success {
+  @apply bg-profit-600 text-white;
+}
+
+.toast-error {
+  @apply bg-loss-600 text-white;
+}
+
+.toast-loading {
+  @apply bg-cerebro-600 text-white;
+}

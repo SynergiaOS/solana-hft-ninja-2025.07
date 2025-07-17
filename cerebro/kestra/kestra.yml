@@ -1,0 +1,80 @@
+# Kestra Configuration for Project Cerebro
+# Orchestrator for automated workflows and scheduled analysis
+
+kestra:
+  # Server configuration
+  server:
+    port: 8080
+    host: 0.0.0.0
+    
+  # Database configuration (using H2 for development)
+  datasources:
+    postgres:
+      url: jdbc:h2:mem:public;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE
+      driverClassName: org.h2.Driver
+      username: sa
+      password: ""
+      
+  # Storage configuration
+  storage:
+    type: local
+    local:
+      base-path: /app/storage
+      
+  # Queue configuration
+  queue:
+    type: memory
+    
+  # Repository configuration
+  repository:
+    type: memory
+    
+  # Metrics configuration
+  metrics:
+    enabled: true
+    
+  # Security configuration
+  security:
+    enabled: false  # Disabled for development
+    
+  # Plugin configuration
+  plugins:
+    repositories:
+      central:
+        url: https://repo1.maven.org/maven2/
+        
+  # Logging configuration
+  logging:
+    level:
+      io.kestra: INFO
+      root: WARN
+      
+# Environment variables for Cerebro integration
+cerebro:
+  api:
+    url: ${CEREBRO_BFF_URL:http://cerebro-bff:8000}
+    timeout: 30s
+    
+  dragonfly:
+    url: ${DRAGONFLY_URL:rediss://default:57q5c8g81u6q@pj1augq7v.dragonflydb.cloud:6385}
+    
+  hft_ninja:
+    url: ${HFT_NINJA_API_URL:http://host.docker.internal:8080}
+    
+  notifications:
+    enabled: true
+    webhook_url: ${WEBHOOK_URL:}
+    
+# Flow execution configuration
+execution:
+  # Default timeout for flows
+  timeout: PT30M
+  
+  # Retry configuration
+  retry:
+    max_attempts: 3
+    delay: PT1M
+    
+  # Concurrency limits
+  concurrency:
+    max_concurrent_executions: 10

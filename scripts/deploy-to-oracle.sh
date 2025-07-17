@@ -8,7 +8,7 @@ set -e
 # Configuration
 ORACLE_IP="130.61.104.45"
 ORACLE_USER="opc"
-SSH_KEY="~/.ssh/oracle_cloud"
+SSH_KEY="ssh-key-2025-07-16.key"
 PROJECT_DIR="/opt/solana-hft-ninja"
 REPO_URL="https://github.com/SynergiaOS/solana-hft-ninja-2025.07.git"
 

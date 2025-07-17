@@ -12,6 +12,8 @@ Cargo.lock
 # Environment
 .env
 .env.local
+.env.mainnet
+.env.production
 
 # Logs
 logs/
@@ -19,11 +21,22 @@ logs/
 
 # Data
 data/
-
+ssh-keypair
 # Config (except templates)
 config/wallet.json
 config/keypair.json
 config/config.toml
+
+# Mainnet secrets
+*.json
+.solana-*/
+emergency.state
+RESTART_INSTRUCTIONS.txt
+
+# SSH keys
+*.key
+*.key.pub
+ssh-key-*
 
 # OS
 .DS_Store

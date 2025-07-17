@@ -37,13 +37,13 @@ fi
 echo "🚀 Starting HFT Ninja with Infisical secrets injection..."
 echo ""
 
-# Run with Infisical
+# Run with Infisical (DEVNET Testing)
 infisical run \
     --projectId="$PROJECT_ID" \
     --env="$ENVIRONMENT" \
     --token="$INFISICAL_TOKEN" \
     -- ./target/release/hft_main \
-    --dry-run \
+    --config-path config/config.toml \
     --enable-helius \
     --enable-mev \
     --enable-jito \

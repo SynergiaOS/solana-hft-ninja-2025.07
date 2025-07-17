@@ -1,0 +1,165 @@
+# 📊 MAINNET MONITORING STACK
+# Production-grade monitoring with Prometheus, Grafana, and Alertmanager
+
+version: '3.8'
+
+services:
+  # Prometheus - Metrics collection
+  prometheus:
+    image: prom/prometheus:v2.45.0
+    container_name: cerebro-prometheus
+    restart: unless-stopped
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+      - ./prometheus/rules:/etc/prometheus/rules
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--storage.tsdb.retention.time=30d'
+      - '--web.enable-lifecycle'
+      - '--web.enable-admin-api'
+    networks:
+      - monitoring
+
+  # Grafana - Visualization
+  grafana:
+    image: grafana/grafana:10.0.0
+    container_name: cerebro-grafana
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=cerebro_admin_2024
+      - GF_USERS_ALLOW_SIGN_UP=false
+      - GF_INSTALL_PLUGINS=grafana-clock-panel,grafana-simple-json-datasource
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./grafana/provisioning:/etc/grafana/provisioning
+      - ./grafana/dashboards:/var/lib/grafana/dashboards
+    networks:
+      - monitoring
+
+  # Alertmanager - Alert routing
+  alertmanager:
+    image: prom/alertmanager:v0.25.0
+    container_name: cerebro-alertmanager
+    restart: unless-stopped
+    ports:
+      - "9093:9093"
+    volumes:
+      - ./alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml
+      - alertmanager_data:/alertmanager
+    command:
+      - '--config.file=/etc/alertmanager/alertmanager.yml'
+      - '--storage.path=/alertmanager'
+      - '--web.external-url=http://localhost:9093'
+    networks:
+      - monitoring
+
+  # Node Exporter - System metrics
+  node-exporter:
+    image: prom/node-exporter:v1.6.0
+    container_name: cerebro-node-exporter
+    restart: unless-stopped
+    ports:
+      - "9100:9100"
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/rootfs:ro
+    command:
+      - '--path.procfs=/host/proc'
+      - '--path.rootfs=/rootfs'
+      - '--path.sysfs=/host/sys'
+      - '--collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc)($$|/)'
+    networks:
+      - monitoring
+
+  # Redis Exporter - Redis metrics
+  redis-exporter:
+    image: oliver006/redis_exporter:v1.52.0
+    container_name: cerebro-redis-exporter
+    restart: unless-stopped
+    ports:
+      - "9121:9121"
+    environment:
+      - REDIS_ADDR=redis://redis:6379
+    networks:
+      - monitoring
+      - app
+
+  # Postgres Exporter - Database metrics
+  postgres-exporter:
+    image: prometheuscommunity/postgres-exporter:v0.13.2
+    container_name: cerebro-postgres-exporter
+    restart: unless-stopped
+    ports:
+      - "9187:9187"
+    environment:
+      - DATA_SOURCE_NAME=postgresql://cerebro:password@postgres:5432/cerebro?sslmode=disable
+    networks:
+      - monitoring
+      - app
+
+  # Custom HFT Metrics Exporter
+  hft-exporter:
+    build:
+      context: ../
+      dockerfile: monitoring/Dockerfile.hft-exporter
+    container_name: cerebro-hft-exporter
+    restart: unless-stopped
+    ports:
+      - "9200:9200"
+    environment:
+      - HFT_API_URL=http://hft-engine:8080
+      - METRICS_PORT=9200
+    volumes:
+      - ../logs:/app/logs:ro
+    networks:
+      - monitoring
+      - app
+
+  # Log aggregation with Loki
+  loki:
+    image: grafana/loki:2.8.0
+    container_name: cerebro-loki
+    restart: unless-stopped
+    ports:
+      - "3100:3100"
+    volumes:
+      - ./loki/loki-config.yml:/etc/loki/local-config.yaml
+      - loki_data:/loki
+    command: -config.file=/etc/loki/local-config.yaml
+    networks:
+      - monitoring
+
+  # Log shipping with Promtail
+  promtail:
+    image: grafana/promtail:2.8.0
+    container_name: cerebro-promtail
+    restart: unless-stopped
+    volumes:
+      - ./promtail/promtail-config.yml:/etc/promtail/config.yml
+      - ../logs:/var/log/cerebro:ro
+      - /var/log:/var/log/host:ro
+    command: -config.file=/etc/promtail/config.yml
+    networks:
+      - monitoring
+
+volumes:
+  prometheus_data:
+  grafana_data:
+  alertmanager_data:
+  loki_data:
+
+networks:
+  monitoring:
+    driver: bridge
+  app:
+    external: true
+    name: cerebro_app
