@@ -27,6 +27,7 @@ logger = logging.getLogger(__name__)
 # Environment variables
 DRAGONFLY_URL = os.getenv("DRAGONFLY_URL", "rediss://default:57q5c8g81u6q@pj1augq7v.dragonflydb.cloud:6385")
 HFT_NINJA_API_URL = os.getenv("HFT_NINJA_API_URL", "http://host.docker.internal:8080")
+AI_API_URL = os.getenv("AI_API_URL", "http://localhost:8003")
 ENVIRONMENT = os.getenv("ENVIRONMENT", "development")
 
 # FastAPI app
@@ -1002,6 +1003,63 @@ async def send_periodic_updates():
         await asyncio.sleep(10)
 
 # Background task will be started in existing startup_event
+
+# AI Proxy Endpoints
+@app.post("/ai/calculate/position-size")
+async def proxy_position_size(request: Dict[str, Any]):
+    """Proxy position size calculation to AI API"""
+    try:
+        async with httpx.AsyncClient() as client:
+            response = await client.post(
+                f"{AI_API_URL}/calculate/position-size",
+                json=request,
+                timeout=30.0
+            )
+            response.raise_for_status()
+            return response.json()
+    except Exception as e:
+        logger.error(f"AI API error: {e}")
+        raise HTTPException(status_code=500, detail=f"AI API error: {str(e)}")
+
+@app.post("/ai/calculate/arbitrage-profit")
+async def proxy_arbitrage_profit(request: Dict[str, Any]):
+    """Proxy arbitrage profit calculation to AI API"""
+    try:
+        async with httpx.AsyncClient() as client:
+            response = await client.post(
+                f"{AI_API_URL}/calculate/arbitrage-profit",
+                json=request,
+                timeout=30.0
+            )
+            response.raise_for_status()
+            return response.json()
+    except Exception as e:
+        logger.error(f"AI API error: {e}")
+        raise HTTPException(status_code=500, detail=f"AI API error: {str(e)}")
+
+@app.get("/ai/metrics")
+async def proxy_ai_metrics():
+    """Proxy AI metrics"""
+    try:
+        async with httpx.AsyncClient() as client:
+            response = await client.get(f"{AI_API_URL}/metrics", timeout=10.0)
+            response.raise_for_status()
+            return response.json()
+    except Exception as e:
+        logger.error(f"AI API error: {e}")
+        raise HTTPException(status_code=500, detail=f"AI API error: {str(e)}")
+
+@app.get("/ai/health")
+async def proxy_ai_health():
+    """Proxy AI health check"""
+    try:
+        async with httpx.AsyncClient() as client:
+            response = await client.get(f"{AI_API_URL}/health", timeout=10.0)
+            response.raise_for_status()
+            return response.json()
+    except Exception as e:
+        logger.error(f"AI API error: {e}")
+        raise HTTPException(status_code=500, detail=f"AI API error: {str(e)}")
 
 if __name__ == "__main__":
     import uvicorn

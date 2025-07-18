@@ -15,7 +15,7 @@ RUN apt-get update && apt-get install -y \
 COPY Cargo.toml Cargo.lock ./
 
 # Build dependencies (cached layer)
-RUN mkdir src && echo "fn main() {}" > src/main.rs
+RUN mkdir -p src/bin && echo "fn main() {}" > src/bin/main.rs
 RUN cargo build --release && rm -rf src
 
 # Copy source code
