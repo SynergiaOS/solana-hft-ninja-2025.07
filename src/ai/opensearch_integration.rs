@@ -305,7 +305,8 @@ impl OpenSearchEngine {
             .context("Failed to search patterns")?;
         
         let result: Value = response.json().await?;
-        let hits = result["hits"]["hits"].as_array().unwrap_or(&vec![]);
+        let empty_vec = vec![];
+        let hits = result["hits"]["hits"].as_array().unwrap_or(&empty_vec);
         
         let search_results: Vec<SearchResult> = hits.iter()
             .map(|hit| SearchResult {
@@ -397,7 +398,8 @@ impl OpenSearchEngine {
             .context("Failed to search wallet behavior")?;
         
         let result: Value = response.json().await?;
-        let hits = result["hits"]["hits"].as_array().unwrap_or(&vec![]);
+        let empty_vec2 = vec![];
+        let hits = result["hits"]["hits"].as_array().unwrap_or(&empty_vec2);
         
         // Analyze patterns (simplified)
         let pattern_analysis = PatternAnalysis {

@@ -27,6 +27,10 @@ sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 # Import Scrapy API
 from app.api.scrapy import router as scrapy_router
 
+# Import Webhook Handler
+sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'api'))
+from webhook_handler import webhook_handler, OpportunityEvent, ExecutionEvent, RiskEvent, WalletEvent
+
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -150,6 +154,15 @@ async def shutdown_event():
         await http_client.aclose()
 
     logger.info("👋 Cerebro BFF shutdown complete")
+
+    # Shutdown webhook handler
+    await webhook_handler.shutdown()
+
+# Initialize webhook handler on startup
+@app.on_event("startup")
+async def init_webhook_handler():
+    """Initialize webhook handler"""
+    await webhook_handler.initialize()
 
 # API Endpoints
 
@@ -529,6 +542,32 @@ async def approve_request(request_id: str, approved_by: str = "user"):
     except Exception as e:
         logger.error(f"Approval error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+# 🔗 WEBHOOK ENDPOINTS FOR HFT NINJA → CEREBRO COMMUNICATION
+@app.post("/webhook/opportunity", tags=["webhooks"])
+async def webhook_opportunity(event: OpportunityEvent, background_tasks: BackgroundTasks):
+    """Receive MEV opportunity detection from HFT Ninja"""
+    return await webhook_handler.handle_opportunity_event(event, background_tasks)
+
+@app.post("/webhook/execution", tags=["webhooks"])
+async def webhook_execution(event: ExecutionEvent, background_tasks: BackgroundTasks):
+    """Receive trade execution result from HFT Ninja"""
+    return await webhook_handler.handle_execution_event(event, background_tasks)
+
+@app.post("/webhook/risk", tags=["webhooks"])
+async def webhook_risk(event: RiskEvent, background_tasks: BackgroundTasks):
+    """Receive risk management event from HFT Ninja"""
+    return await webhook_handler.handle_risk_event(event, background_tasks)
+
+@app.post("/webhook/wallet", tags=["webhooks"])
+async def webhook_wallet(event: WalletEvent, background_tasks: BackgroundTasks):
+    """Receive wallet tracking event from HFT Ninja"""
+    return await webhook_handler.handle_wallet_event(event, background_tasks)
+
+@app.get("/webhook/events", tags=["webhooks"])
+async def get_recent_events(event_type: Optional[str] = None, limit: int = 50):
+    """Get recent webhook events from memory"""
+    return await webhook_handler.get_recent_events(event_type, limit)
 
 if __name__ == "__main__":
     import uvicorn

@@ -141,3 +141,63 @@ flush_interval_ms = 5000
 refresh_policy = "wait_for"
 replica_count = 0
 shard_count = 1
+
+# 🚀 LMCache Integration - High-Performance AI Model Caching
+[lmcache]
+enabled = true
+cache_size_mb = 512
+ttl_seconds = 3600  # 1 hour
+compression_enabled = true
+eviction_policy = "LRU"
+persistence_enabled = true
+persistence_path = "cache/lmcache"
+metrics_enabled = true
+
+# Distributed caching (optional)
+distributed_cache = false
+redis_url = "redis://localhost:6379"
+
+# Cache performance settings
+max_concurrent_requests = 100
+cache_warming_enabled = true
+preload_models = ["oumi-trading-v1", "sentiment-analyzer"]
+
+# 🤖 AI Integration - Combined AI Configuration
+[ai]
+enabled = true
+cross_validation = true
+ensemble_predictions = true
+confidence_threshold = 0.7
+update_interval_seconds = 30
+
+# AI performance optimization
+parallel_inference = true
+batch_processing = true
+max_batch_size = 32
+inference_timeout_ms = 1000
+
+# Model management
+auto_model_updates = true
+model_version_tracking = true
+fallback_models = ["backup-trading-model"]
+
+# 🔗 Cerebro Integration - Rust ↔ Python Communication
+[cerebro]
+enabled = true
+bff_url = "http://localhost:8002"
+timeout_seconds = 5
+retry_attempts = 3
+retry_delay_ms = 1000
+batch_size = 10
+flush_interval_ms = 5000
+
+# Event filtering
+send_opportunities = true
+send_executions = true
+send_risk_events = true
+send_wallet_events = true
+
+# Performance settings
+async_sending = true
+queue_size = 1000
+health_check_interval_seconds = 60

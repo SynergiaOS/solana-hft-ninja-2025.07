@@ -1,8 +1,17 @@
 import React from 'react';
 import { motion } from 'framer-motion';
+import { Link } from 'react-router-dom';
+import {
+  CpuChipIcon as BrainIcon,
+  SparklesIcon,
+  BoltIcon,
+  ArrowRightIcon
+} from '@heroicons/react/24/outline';
 
 // Components
 import MetricCard from '@/components/ui/MetricCard';
+import Card from '@/components/ui/Card';
+import Badge from '@/components/ui/Badge';
 import TradingChart from '@/components/charts/TradingChart';
 import StrategyCard from '@/components/trading/StrategyCard';
 import RecentTrades from '@/components/trading/RecentTrades';
@@ -94,6 +103,83 @@ const OverviewPage: React.FC = () => {
             loading={metricsLoading}
           />
         </div>
+      </motion.div>
+
+      {/* 🆕 AI Quick Access Section */}
+      <motion.div variants={itemVariants}>
+        <Card className="p-6">
+          <div className="flex items-center justify-between mb-6">
+            <div className="flex items-center space-x-3">
+              <div className="p-2 bg-purple-500/20 rounded-lg">
+                <BrainIcon className="h-6 w-6 text-purple-400" />
+              </div>
+              <div>
+                <h2 className="text-xl font-semibold text-white">AI Intelligence Hub</h2>
+                <p className="text-gray-400 text-sm">Access advanced AI features and insights</p>
+              </div>
+            </div>
+            <Badge variant="default">BETA</Badge>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {/* AI Memory */}
+            <Link to="/ai-memory" className="group">
+              <div className="p-4 bg-gray-800/50 rounded-lg border border-gray-700 hover:border-purple-500/50 transition-all group-hover:bg-gray-800/70">
+                <div className="flex items-center space-x-3 mb-3">
+                  <div className="p-2 bg-purple-500/20 rounded-lg">
+                    <BrainIcon className="h-5 w-5 text-purple-400" />
+                  </div>
+                  <div>
+                    <h3 className="text-white font-medium">AI Memory</h3>
+                    <p className="text-xs text-gray-400">Search patterns & insights</p>
+                  </div>
+                </div>
+                <div className="flex items-center justify-between">
+                  <Badge variant="outline" size="sm">RAG Search</Badge>
+                  <ArrowRightIcon className="h-4 w-4 text-gray-400 group-hover:text-purple-400 transition-colors" />
+                </div>
+              </div>
+            </Link>
+
+            {/* AI Predictions */}
+            <Link to="/predictions" className="group">
+              <div className="p-4 bg-gray-800/50 rounded-lg border border-gray-700 hover:border-blue-500/50 transition-all group-hover:bg-gray-800/70">
+                <div className="flex items-center space-x-3 mb-3">
+                  <div className="p-2 bg-blue-500/20 rounded-lg">
+                    <SparklesIcon className="h-5 w-5 text-blue-400" />
+                  </div>
+                  <div>
+                    <h3 className="text-white font-medium">Predictions</h3>
+                    <p className="text-xs text-gray-400">AI market forecasts</p>
+                  </div>
+                </div>
+                <div className="flex items-center justify-between">
+                  <Badge variant="outline" size="sm">Live AI</Badge>
+                  <ArrowRightIcon className="h-4 w-4 text-gray-400 group-hover:text-blue-400 transition-colors" />
+                </div>
+              </div>
+            </Link>
+
+            {/* Webhook Events */}
+            <Link to="/webhook-events" className="group">
+              <div className="p-4 bg-gray-800/50 rounded-lg border border-gray-700 hover:border-green-500/50 transition-all group-hover:bg-gray-800/70">
+                <div className="flex items-center space-x-3 mb-3">
+                  <div className="p-2 bg-green-500/20 rounded-lg">
+                    <BoltIcon className="h-5 w-5 text-green-400" />
+                  </div>
+                  <div>
+                    <h3 className="text-white font-medium">Live Events</h3>
+                    <p className="text-xs text-gray-400">Real-time webhooks</p>
+                  </div>
+                </div>
+                <div className="flex items-center justify-between">
+                  <Badge variant="outline" size="sm">Real-time</Badge>
+                  <ArrowRightIcon className="h-4 w-4 text-gray-400 group-hover:text-green-400 transition-colors" />
+                </div>
+              </div>
+            </Link>
+          </div>
+        </Card>
       </motion.div>
 
       {/* Main Content Grid */}

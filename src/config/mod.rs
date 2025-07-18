@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 use std::path::Path;
 use crate::strategies::wallet_tracker::WalletTrackerConfig;
-use crate::ai::{AIConfig, OumiConfig, OpenSearchConfig, IntegrationConfig};
+use crate::ai::{AIConfig, OumiConfig, OpenSearchConfig, LMCacheConfig, IntegrationConfig};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Config {
@@ -15,6 +15,7 @@ pub struct Config {
     pub wallet_tracker: Option<WalletTrackerConfig>,
     pub oumi_ai: Option<OumiConfig>,
     pub opensearch_ai: Option<OpenSearchConfig>,
+    pub lmcache: Option<LMCacheConfig>,
     pub ai: Option<AIConfig>,
 }
 

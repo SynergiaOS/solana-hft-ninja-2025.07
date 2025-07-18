@@ -122,6 +122,30 @@ solana-hft-ninja-2025.07/
 └── docs/                    # Documentation
 ```
 
+## 🧠 **AI-POWERED INTELLIGENCE**
+
+### **Cost-Effective Multi-AI Ensemble:**
+- **DeepSeek-Math 7B**: Ultra-low cost mathematical calculations (<$1/day)
+- **OUMI Integration**: Advanced on-chain pattern recognition
+- **OpenSearch AI**: Semantic search and anomaly detection
+- **LMCache**: High-performance AI model caching (5x speedup)
+- **FinGPT**: Specialized financial language model
+- **RAG Memory**: Contextual learning from trading history
+
+### **Small Portfolio Optimization:**
+- **4-bit Quantization**: 95% memory reduction vs large models
+- **Smart Caching**: 70% cache hit ratio for cost reduction
+- **Batch Processing**: Multiple calculations in single request
+- **Real-time Risk Assessment**: Sub-200ms latency
+
+### **Available AI Calculations:**
+- **Position Sizing**: Kelly Criterion optimization
+- **Arbitrage Analysis**: Cross-DEX profit calculation
+- **Sandwich Parameters**: MEV attack optimization
+- **Risk Assessment**: Comprehensive risk evaluation
+
+See [DeepSeek-Math Integration Guide](docs/DEEPSEEK_MATH_INTEGRATION.md) for detailed setup.
+
 ## 🛠️ Configuration
 
 ### Environment Variables

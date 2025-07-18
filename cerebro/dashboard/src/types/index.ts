@@ -295,6 +295,122 @@ export interface Theme {
   };
 }
 
+// 🧠 AI & Memory Types
+export interface ContextEntry {
+  context_id: string;
+  content: string;
+  context_type: 'MEV_OPPORTUNITY' | 'TRADE_OUTCOME_SUCCESS' | 'TRADE_OUTCOME_FAILURE' | 'RISK_ALERT' | 'WALLET_ACTIVITY';
+  source: 'HFT_NINJA_WEBHOOK' | 'OUMI_DATA' | 'SCRAPY_CRAWLER' | 'MANUAL_INPUT';
+  timestamp: number;
+  confidence: number;
+  related_strategy?: string;
+  metadata?: Record<string, any>;
+}
+
+export interface RAGSearchResult {
+  context_entry: ContextEntry;
+  similarity_score: number;
+  relevance_explanation?: string;
+}
+
+// 🔗 Webhook Event Types
+export interface OpportunityEvent {
+  event_type: 'opportunity_detected';
+  token_address: string;
+  opportunity_type: string;
+  confidence: number;
+  profit_potential: number;
+  risk_score: number;
+  trigger_wallet?: string;
+  dex_involved: string;
+  timestamp: number;
+  metadata: Record<string, any>;
+}
+
+export interface ExecutionEvent {
+  event_type: 'execution_result';
+  transaction_id: string;
+  strategy: string;
+  token_address: string;
+  outcome: 'success' | 'failure' | 'partial';
+  pnl_sol: number;
+  execution_time_ms: number;
+  gas_used: number;
+  trigger_wallet?: string;
+  timestamp: number;
+  metadata: Record<string, any>;
+}
+
+export interface RiskEvent {
+  event_type: 'risk_event';
+  risk_type: string;
+  severity: 'low' | 'medium' | 'high' | 'critical';
+  description: string;
+  affected_strategies: string[];
+  action_taken: string;
+  timestamp: number;
+  metadata: Record<string, any>;
+}
+
+export interface WalletEvent {
+  event_type: 'wallet_event';
+  wallet_address: string;
+  event_subtype: string;
+  token_address?: string;
+  amount_sol?: number;
+  confidence: number;
+  timestamp: number;
+  metadata: Record<string, any>;
+}
+
+// 🤖 AI Prediction Types
+export interface TradingPrediction {
+  token_address: string;
+  prediction_type: 'PriceIncrease' | 'PriceDecrease' | 'HighVolatility' | 'RugPull' | 'WhaleActivity';
+  confidence: number;
+  price_target?: number;
+  time_horizon_minutes: number;
+  risk_score: number;
+  sentiment_score: number;
+  technical_indicators: Record<string, number>;
+  reasoning: string;
+}
+
+export interface MarketAnalysisAI {
+  overall_sentiment: number;
+  market_trend: 'Bullish' | 'Bearish' | 'Sideways' | 'Uncertain';
+  volatility_index: number;
+  risk_level: 'Low' | 'Medium' | 'High' | 'Critical';
+  recommended_actions: RecommendedAction[];
+  key_insights: string[];
+}
+
+export interface RecommendedAction {
+  action_type: 'Buy' | 'Sell' | 'Hold' | 'AvoidToken' | 'IncreasePosition' | 'DecreasePosition';
+  token_address?: string;
+  confidence: number;
+  urgency: 'Low' | 'Medium' | 'High' | 'Immediate';
+  reasoning: string;
+}
+
+// 📊 Enhanced Trading Metrics
+export interface EnhancedTradingMetrics extends TradingMetrics {
+  aiPredictionAccuracy: number;
+  webhookLatency: number;
+  cacheHitRatio: number;
+  activeStrategies: number;
+  memoryUtilization: number;
+  ragSearchQueries: number;
+}
+
+// 🔄 Real-time Data Stream Types
+export interface DataStreamEvent {
+  stream_type: 'opportunity' | 'execution' | 'risk' | 'wallet' | 'ai_prediction';
+  event_data: OpportunityEvent | ExecutionEvent | RiskEvent | WalletEvent | TradingPrediction;
+  processing_time_ms: number;
+  source_system: 'rust_hft' | 'python_cerebro' | 'ai_coordinator';
+}
+
 // Export utility types
 export type Status = 'loading' | 'success' | 'error' | 'idle';
 export type TimeFrame = '1m' | '5m' | '15m' | '1h' | '4h' | '1d' | '1w';

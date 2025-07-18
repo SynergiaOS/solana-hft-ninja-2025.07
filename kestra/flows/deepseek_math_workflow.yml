@@ -1,0 +1,351 @@
+# 🧮 DeepSeek-Math Workflow for Cost-Effective Trading Calculations
+# Optimized for <$1 daily operational cost with smart caching and batching
+
+id: deepseek_math_trading_calculations
+namespace: solana.hft.ai
+
+description: |
+  Cost-effective AI trading calculations using DeepSeek-Math 7B model.
+  Optimized for small portfolios with minimal operational costs.
+  
+  Features:
+  - 4-bit quantization for memory efficiency
+  - Smart caching to reduce inference costs
+  - Batch processing for multiple calculations
+  - Real-time risk assessment
+  - Position sizing optimization
+
+labels:
+  environment: production
+  cost_tier: ultra_low
+  model: deepseek-math-7b
+
+inputs:
+  - id: calculation_type
+    type: SELECT
+    displayName: Calculation Type
+    description: Type of trading calculation to perform
+    values:
+      - position_sizing
+      - arbitrage_profit
+      - sandwich_calculation
+      - risk_assessment
+      - batch_calculations
+    defaults: position_sizing
+
+  - id: trading_data
+    type: JSON
+    displayName: Trading Data
+    description: Input data for calculations (varies by calculation type)
+    defaults: |
+      {
+        "capital": 8.0,
+        "risk_tolerance": 0.05,
+        "expected_return": 0.15,
+        "volatility": 0.3,
+        "strategy": "wallet_tracker"
+      }
+
+  - id: enable_caching
+    type: BOOLEAN
+    displayName: Enable Caching
+    description: Use LMCache to reduce costs
+    defaults: true
+
+  - id: batch_size
+    type: INT
+    displayName: Batch Size
+    description: Number of calculations to batch together
+    defaults: 4
+
+variables:
+  deepseek_api_url: "http://deepseek-math:8003"
+  max_cost_per_calculation: 0.001  # $0.001 per calculation
+  cache_ttl_hours: 1
+
+tasks:
+  # 🏥 Health Check - Ensure DeepSeek-Math is ready
+  - id: health_check
+    type: io.kestra.plugin.core.http.Request
+    uri: "{{ vars.deepseek_api_url }}/health"
+    method: GET
+    timeout: PT30S
+    retry:
+      maxAttempt: 3
+      delay: PT10S
+
+  # 📊 Cost Estimation - Estimate calculation cost
+  - id: estimate_cost
+    type: io.kestra.plugin.core.execution.WorkingDirectory
+    tasks:
+      - id: calculate_estimated_cost
+        type: io.kestra.plugin.scripts.python.Script
+        beforeCommands:
+          - pip install requests
+        script: |
+          import json
+          import requests
+          
+          # Get current metrics
+          metrics_url = "{{ vars.deepseek_api_url }}/metrics"
+          response = requests.get(metrics_url)
+          metrics = response.json()
+          
+          # Estimate cost based on calculation type and batch size
+          calculation_type = "{{ inputs.calculation_type }}"
+          batch_size = {{ inputs.batch_size }}
+          
+          cost_per_token = 0.000001  # DeepSeek-Math cost
+          estimated_tokens = {
+              "position_sizing": 150,
+              "arbitrage_profit": 200,
+              "sandwich_calculation": 180,
+              "risk_assessment": 250,
+              "batch_calculations": 150 * batch_size
+          }
+          
+          tokens_needed = estimated_tokens.get(calculation_type, 200)
+          estimated_cost = tokens_needed * cost_per_token
+          
+          print(f"Estimated cost: ${estimated_cost:.6f}")
+          print(f"Tokens needed: {tokens_needed}")
+          print(f"Cache hit ratio: {metrics.get('cache_hit_ratio', 0):.2f}")
+          
+          # Check if within budget
+          max_cost = {{ vars.max_cost_per_calculation }}
+          if estimated_cost > max_cost:
+              raise Exception(f"Estimated cost ${estimated_cost:.6f} exceeds budget ${max_cost:.6f}")
+          
+          # Output for next tasks
+          with open('cost_estimate.json', 'w') as f:
+              json.dump({
+                  "estimated_cost": estimated_cost,
+                  "tokens_needed": tokens_needed,
+                  "within_budget": True,
+                  "cache_hit_ratio": metrics.get('cache_hit_ratio', 0)
+              }, f)
+
+  # 🧮 Execute Calculation - Perform the actual AI calculation
+  - id: execute_calculation
+    type: io.kestra.plugin.core.execution.WorkingDirectory
+    dependsOn: 
+      - health_check
+      - estimate_cost
+    tasks:
+      - id: perform_calculation
+        type: io.kestra.plugin.scripts.python.Script
+        beforeCommands:
+          - pip install requests
+        script: |
+          import json
+          import requests
+          import time
+          
+          api_url = "{{ vars.deepseek_api_url }}"
+          calculation_type = "{{ inputs.calculation_type }}"
+          trading_data = json.loads('''{{ inputs.trading_data }}''')
+          
+          start_time = time.time()
+          
+          # Route to appropriate endpoint
+          if calculation_type == "position_sizing":
+              endpoint = f"{api_url}/calculate/position-size"
+              payload = {
+                  "capital": trading_data.get("capital", 8.0),
+                  "risk_tolerance": trading_data.get("risk_tolerance", 0.05),
+                  "expected_return": trading_data.get("expected_return", 0.15),
+                  "volatility": trading_data.get("volatility", 0.3),
+                  "strategy": trading_data.get("strategy", "wallet_tracker")
+              }
+          
+          elif calculation_type == "arbitrage_profit":
+              endpoint = f"{api_url}/calculate/arbitrage-profit"
+              payload = {
+                  "token": trading_data.get("token", "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"),
+                  "price_a": trading_data.get("price_a", 1.0),
+                  "price_b": trading_data.get("price_b", 1.02),
+                  "liquidity_a": trading_data.get("liquidity_a", 1000.0),
+                  "liquidity_b": trading_data.get("liquidity_b", 800.0),
+                  "gas_cost": trading_data.get("gas_cost", 0.001)
+              }
+          
+          elif calculation_type == "sandwich_calculation":
+              endpoint = f"{api_url}/calculate/sandwich"
+              payload = {
+                  "target_tx_size": trading_data.get("target_tx_size", 5.0),
+                  "pool_liquidity": trading_data.get("pool_liquidity", 10000.0),
+                  "current_price": trading_data.get("current_price", 0.5),
+                  "slippage": trading_data.get("slippage", 1.0)
+              }
+          
+          elif calculation_type == "risk_assessment":
+              endpoint = f"{api_url}/assess/risk"
+              payload = {
+                  "strategy": trading_data.get("strategy", "wallet_tracker"),
+                  "token": trading_data.get("token", "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"),
+                  "position_size": trading_data.get("position_size", 1.0),
+                  "market_conditions": trading_data.get("market_conditions", {"trend": "bullish"}),
+                  "volatility": trading_data.get("volatility", 0.3),
+                  "liquidity": trading_data.get("liquidity", 5000.0)
+              }
+          
+          else:
+              raise ValueError(f"Unknown calculation type: {calculation_type}")
+          
+          # Make API request
+          response = requests.post(endpoint, json=payload, timeout=30)
+          response.raise_for_status()
+          
+          result = response.json()
+          execution_time = time.time() - start_time
+          
+          # Add execution metadata
+          result["kestra_execution_time"] = execution_time
+          result["kestra_timestamp"] = time.time()
+          result["kestra_flow_id"] = "{{ flow.id }}"
+          result["kestra_execution_id"] = "{{ execution.id }}"
+          
+          print(f"✅ Calculation completed in {execution_time:.2f}s")
+          print(f"Result: {json.dumps(result, indent=2)}")
+          
+          # Save result
+          with open('calculation_result.json', 'w') as f:
+              json.dump(result, f, indent=2)
+
+  # 📊 Performance Metrics - Track AI performance and costs
+  - id: track_metrics
+    type: io.kestra.plugin.core.execution.WorkingDirectory
+    dependsOn: execute_calculation
+    tasks:
+      - id: update_metrics
+        type: io.kestra.plugin.scripts.python.Script
+        beforeCommands:
+          - pip install requests
+        script: |
+          import json
+          import requests
+          import time
+          
+          # Load calculation result
+          with open('calculation_result.json', 'r') as f:
+              result = json.loads(f.read())
+          
+          # Load cost estimate
+          with open('cost_estimate.json', 'r') as f:
+              cost_data = json.loads(f.read())
+          
+          # Get updated metrics
+          metrics_url = "{{ vars.deepseek_api_url }}/metrics"
+          response = requests.get(metrics_url)
+          current_metrics = response.json()
+          
+          # Calculate actual cost (simplified)
+          actual_tokens = result.get("execution_time_ms", 200) / 10  # Rough estimate
+          actual_cost = actual_tokens * 0.000001
+          
+          # Performance tracking
+          performance_data = {
+              "timestamp": time.time(),
+              "calculation_type": "{{ inputs.calculation_type }}",
+              "estimated_cost": cost_data["estimated_cost"],
+              "actual_cost": actual_cost,
+              "execution_time_ms": result.get("execution_time_ms", 0),
+              "confidence": result.get("confidence", 0),
+              "cache_hit": cost_data["cache_hit_ratio"] > 0.5,
+              "model_used": result.get("model_used", "deepseek-math-7b"),
+              "success": True,
+              "cost_efficiency": cost_data["estimated_cost"] / max(actual_cost, 0.000001)
+          }
+          
+          print(f"📊 Performance Metrics:")
+          print(f"   Actual cost: ${actual_cost:.6f}")
+          print(f"   Execution time: {result.get('execution_time_ms', 0)}ms")
+          print(f"   Confidence: {result.get('confidence', 0):.2f}")
+          print(f"   Cost efficiency: {performance_data['cost_efficiency']:.2f}x")
+          
+          # Save metrics
+          with open('performance_metrics.json', 'w') as f:
+              json.dump(performance_data, f, indent=2)
+
+  # 🔄 Cache Management - Optimize cache for cost reduction
+  - id: optimize_cache
+    type: io.kestra.plugin.core.execution.WorkingDirectory
+    dependsOn: track_metrics
+    condition: "{{ inputs.enable_caching }}"
+    tasks:
+      - id: cache_optimization
+        type: io.kestra.plugin.scripts.python.Script
+        beforeCommands:
+          - pip install requests
+        script: |
+          import json
+          import requests
+          
+          # Get cache metrics
+          metrics_url = "{{ vars.deepseek_api_url }}/metrics"
+          response = requests.get(metrics_url)
+          metrics = response.json()
+          
+          cache_hit_ratio = metrics.get("cache_hit_ratio", 0)
+          memory_usage = metrics.get("memory_usage_mb", 0)
+          
+          print(f"🔄 Cache Status:")
+          print(f"   Hit ratio: {cache_hit_ratio:.2%}")
+          print(f"   Memory usage: {memory_usage:.1f} MB")
+          
+          # Clear cache if hit ratio is too low (cache pollution)
+          if cache_hit_ratio < 0.1 and memory_usage > 500:
+              print("🧹 Clearing cache due to low hit ratio...")
+              clear_response = requests.post(f"{{ vars.deepseek_api_url }}/cache/clear")
+              if clear_response.status_code == 200:
+                  print("✅ Cache cleared successfully")
+              else:
+                  print("❌ Failed to clear cache")
+
+# 🚨 Error Handling
+errors:
+  - id: cost_exceeded
+    type: io.kestra.plugin.core.execution.Fail
+    condition: "{{ outputs.estimate_cost.vars.within_budget == false }}"
+    message: "Calculation cost exceeds budget limit"
+
+  - id: api_unavailable
+    type: io.kestra.plugin.core.execution.Fail
+    condition: "{{ outputs.health_check.code != 200 }}"
+    message: "DeepSeek-Math API is not available"
+
+# 📈 Outputs
+outputs:
+  - id: calculation_result
+    type: JSON
+    value: "{{ outputs.execute_calculation.vars.calculation_result }}"
+  
+  - id: performance_metrics
+    type: JSON
+    value: "{{ outputs.track_metrics.vars.performance_metrics }}"
+  
+  - id: cost_summary
+    type: JSON
+    value: |
+      {
+        "estimated_cost": {{ outputs.estimate_cost.vars.estimated_cost }},
+        "actual_cost": {{ outputs.track_metrics.vars.actual_cost }},
+        "cost_efficiency": {{ outputs.track_metrics.vars.cost_efficiency }},
+        "within_budget": true
+      }
+
+# ⏰ Triggers
+triggers:
+  # Scheduled optimization runs
+  - id: daily_cost_optimization
+    type: io.kestra.plugin.core.trigger.Schedule
+    cron: "0 6 * * *"  # Daily at 6 AM
+    inputs:
+      calculation_type: "batch_calculations"
+      enable_caching: true
+      batch_size: 10
+
+  # Webhook trigger for real-time calculations
+  - id: realtime_calculation
+    type: io.kestra.plugin.core.trigger.Webhook
+    key: "deepseek_math_calculate"

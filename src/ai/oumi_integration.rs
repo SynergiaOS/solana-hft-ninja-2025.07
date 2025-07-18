@@ -333,10 +333,10 @@ impl OumiEngine {
             } else {
                 PredictionType::PriceDecrease
             },
-            confidence,
+            confidence: confidence.into(),
             price_target: Some(features[0] as f64 * 1.1), // 10% increase target
             time_horizon_minutes: 30,
-            risk_score,
+            risk_score: risk_score.into(),
             sentiment_score: 0.6,
             technical_indicators: HashMap::from([
                 ("rsi".to_string(), features.get(3).unwrap_or(&50.0).clone() as f64),
@@ -366,7 +366,7 @@ impl OumiEngine {
 }
 
 /// Market data structure for AI input
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MarketData {
     pub current_price: f64,
     pub volume_24h: f64,

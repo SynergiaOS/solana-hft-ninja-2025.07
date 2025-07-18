@@ -15,6 +15,7 @@ use crate::mempool::ParsedTransaction;
 use crate::core::balance::BalanceTracker;
 use crate::execution::jito::{JitoExecutor, BundleTransaction, BundleResult};
 use crate::security::risk_limits::RiskLimits;
+use crate::cerebro::{CerebroIntegration, metadata};
 
 /// Red flag patterns to avoid
 const RED_FLAG_PATTERNS: [&str; 5] = [
@@ -57,6 +58,9 @@ pub struct Wallet {
     pub connections: Vec<Pubkey>,
     pub risk_score: f64,
     pub gem_score: f64,
+    pub total_trades: u32,
+    pub average_profit: f64,
+    pub last_activity: u64,
 }
 
 /// Token data structure
@@ -120,6 +124,7 @@ pub struct WalletTrackerStrategy {
     balance_tracker: Arc<BalanceTracker>,
     jito_executor: Arc<JitoExecutor>,
     risk_limits: Arc<RiskLimits>,
+    cerebro: Option<Arc<CerebroIntegration>>,
 }
 
 /// ML model for wallet tracking
@@ -187,6 +192,7 @@ impl WalletTrackerStrategy {
         balance_tracker: Arc<BalanceTracker>,
         jito_executor: Arc<JitoExecutor>,
         risk_limits: Arc<RiskLimits>,
+        cerebro: Option<Arc<CerebroIntegration>>,
     ) -> Result<Self> {
         info!("🔍 Initializing Wallet Tracker Strategy...");
         
@@ -209,6 +215,7 @@ impl WalletTrackerStrategy {
             balance_tracker,
             jito_executor,
             risk_limits,
+            cerebro,
         })
     }
     
@@ -230,6 +237,9 @@ impl WalletTrackerStrategy {
                         connections: Vec::new(),
                         risk_score: 0.3,
                         gem_score: 70.0,
+                        total_trades: 0,
+                        average_profit: 0.0,
+                        last_activity: chrono::Utc::now().timestamp() as u64,
                     });
                     info!("🔍 Added tracked wallet: {}", pubkey);
                 },
@@ -258,6 +268,25 @@ impl WalletTrackerStrategy {
                 // If token creation, prepare for snipe
                 if action == ActionType::CreateToken {
                     if let Some(token) = self.extract_token_data(tx).await? {
+                        // Notify Cerebro about opportunity
+                        if let Some(cerebro) = &self.cerebro {
+                            let metadata = metadata::wallet_event(
+                                Some(wallet.total_trades),
+                                Some(wallet.success_rate),
+                                Some(wallet.average_profit),
+                                Some(wallet.risk_score),
+                            );
+
+                            let _ = cerebro.notify_wallet(
+                                &wallet.address.to_string(),
+                                "new_token_creation",
+                                Some(&token.address.to_string()),
+                                None,
+                                0.8, // High confidence for tracked wallet
+                                metadata,
+                            ).await;
+                        }
+
                         if self.should_snipe(&wallet, &token).await? {
                             self.execute_snipe(wallet, &token).await?;
                         }
@@ -359,10 +388,52 @@ impl WalletTrackerStrategy {
         match self.jito_executor.execute_bundle(bundle).await {
             Ok(result) => {
                 info!("🔍 Snipe bundle executed: {}", result.bundle_id);
+
+                // Notify Cerebro about execution
+                if let Some(cerebro) = &self.cerebro {
+                    let metadata = metadata::trade_execution(
+                        None, // slippage
+                        None, // price_impact
+                        Some("wallet_tracker_snipe"),
+                        None, // bundle_position
+                    );
+
+                    let _ = cerebro.notify_execution(
+                        &result.bundle_id,
+                        "wallet_tracker",
+                        &token.address.to_string(),
+                        "success",
+                        position_size, // Assume this is profit for now
+                        50, // execution_time_ms (placeholder)
+                        0, // gas_used (placeholder)
+                        Some(&wallet.address.to_string()),
+                        metadata,
+                    ).await;
+                }
+
                 Ok(())
             },
             Err(e) => {
                 error!("🔍 Failed to execute snipe bundle: {}", e);
+
+                // Notify Cerebro about failure
+                if let Some(cerebro) = &self.cerebro {
+                    let metadata = metadata::trade_execution(
+                        None, None, Some("wallet_tracker_snipe"), None,
+                    );
+
+                    let _ = cerebro.notify_execution(
+                        "failed_bundle",
+                        "wallet_tracker",
+                        &token.address.to_string(),
+                        "failure",
+                        0.0, // No profit on failure
+                        0, 0,
+                        Some(&wallet.address.to_string()),
+                        metadata,
+                    ).await;
+                }
+
                 Err(e.into())
             }
         }

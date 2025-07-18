@@ -4,6 +4,8 @@
 
 pub mod oumi_integration;
 pub mod opensearch_integration;
+pub mod lmcache_integration;
+pub mod deepseek_client;
 
 pub use oumi_integration::{
     OumiEngine, OumiConfig, TradingPrediction, MarketAnalysis, 
@@ -15,6 +17,11 @@ pub use opensearch_integration::{
     OpenSearchEngine, OpenSearchConfig, SearchResult, PatternAnalysis,
     PatternType, RiskIndicator, RiskSeverity, AnomalyResult, AnomalyType,
     IndexConfig, VectorSearchConfig, AnalyticsConfig, PerformanceConfig
+};
+
+pub use lmcache_integration::{
+    LMCacheEngine, LMCacheConfig, CachedInference, InferenceResult,
+    EvictionPolicy, CacheStats
 };
 
 use anyhow::Result;

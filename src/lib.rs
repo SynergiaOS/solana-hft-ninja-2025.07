@@ -14,6 +14,7 @@ pub mod simple_engine;
 pub mod security;
 pub mod engine;
 pub mod ai;
+pub mod cerebro;
 
 pub use config::Config;
 pub use bridge::*;
@@ -24,3 +25,4 @@ pub use execution::*;
 pub use monitoring::*;
 pub use engine::*;
 pub use ai::*;
+pub use cerebro::*;

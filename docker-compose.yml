@@ -70,10 +70,53 @@ services:
     networks:
       - hft-network
 
+  # 🧮 DeepSeek-Math Small Expert Model (Cost-Effective AI)
+  deepseek-math:
+    build:
+      context: ./cerebro
+      dockerfile: Dockerfile.deepseek
+    environment:
+      - PYTHONPATH=/app
+      - HUGGINGFACE_TOKEN=${HUGGINGFACE_TOKEN}
+      - CUDA_VISIBLE_DEVICES=0
+      - PYTORCH_CUDA_ALLOC_CONF=max_split_size_mb:512
+      - MODEL_NAME=deepseek-ai/deepseek-math-7b-instruct
+      - USE_QUANTIZATION=true
+      - USE_LMCACHE=true
+      - CACHE_SIZE_MB=1024
+    volumes:
+      - ./cerebro:/app
+      - deepseek_models:/app/models
+      - deepseek_cache:/app/cache
+    networks:
+      - hft-network
+    ports:
+      - "8003:8003"  # DeepSeek-Math API
+    deploy:
+      resources:
+        limits:
+          memory: 8G
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8003/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    restart: unless-stopped
+
 volumes:
   prometheus_data:
     driver: local
   grafana-storage:
+    driver: local
+  # 🧮 DeepSeek-Math volumes
+  deepseek_models:
+    driver: local
+  deepseek_cache:
     driver: local
 
 networks:

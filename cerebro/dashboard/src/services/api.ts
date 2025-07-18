@@ -261,6 +261,87 @@ class ApiClient {
     return this.get('/api/system/metrics');
   }
 
+  // 🧠 AI & Memory API Methods
+  async searchMemory(query: string, contextTypes?: string[]): Promise<any[]> {
+    const params = new URLSearchParams({ query });
+    if (contextTypes?.length) {
+      params.append('context_types', contextTypes.join(','));
+    }
+    return this.get(`/api/memory/search?${params}`);
+  }
+
+  async storeContext(context: any): Promise<any> {
+    return this.post('/api/memory/store', context);
+  }
+
+  async getRecentEvents(limit: number = 50): Promise<any[]> {
+    return this.get(`/api/events/recent?limit=${limit}`);
+  }
+
+  async getOpportunityEvents(limit: number = 20): Promise<any[]> {
+    return this.get(`/api/events/opportunities?limit=${limit}`);
+  }
+
+  async getExecutionEvents(limit: number = 20): Promise<any[]> {
+    return this.get(`/api/events/executions?limit=${limit}`);
+  }
+
+  async getRiskEvents(limit: number = 10): Promise<any[]> {
+    return this.get(`/api/events/risks?limit=${limit}`);
+  }
+
+  async getWalletEvents(walletAddress?: string, limit: number = 20): Promise<any[]> {
+    const params = new URLSearchParams({ limit: limit.toString() });
+    if (walletAddress) {
+      params.append('wallet_address', walletAddress);
+    }
+    return this.get(`/api/events/wallets?${params}`);
+  }
+
+  // 🤖 AI Prediction API Methods
+  async getTradingPredictions(tokenAddress?: string): Promise<any[]> {
+    const params = tokenAddress ? `?token_address=${tokenAddress}` : '';
+    return this.get(`/api/ai/predictions${params}`);
+  }
+
+  async getMarketAnalysis(): Promise<any> {
+    return this.get('/api/ai/market-analysis');
+  }
+
+  async requestAIAnalysis(prompt: string, context?: any): Promise<any> {
+    return this.post('/api/ai/analyze', { prompt, context });
+  }
+
+  // 📊 Enhanced Metrics API Methods
+  async getEnhancedMetrics(): Promise<any> {
+    return this.get('/api/metrics/enhanced');
+  }
+
+  async getAIPerformanceMetrics(): Promise<any> {
+    return this.get('/api/metrics/ai-performance');
+  }
+
+  async getWebhookStatistics(): Promise<any> {
+    return this.get('/api/metrics/webhook-stats');
+  }
+
+  async getCacheMetrics(): Promise<any> {
+    return this.get('/api/metrics/cache');
+  }
+
+  // 🔄 Real-time Data Stream API Methods
+  async getDataStreamStatus(): Promise<any> {
+    return this.get('/api/stream/status');
+  }
+
+  async subscribeToDataStream(streamTypes: string[]): Promise<any> {
+    return this.post('/api/stream/subscribe', { stream_types: streamTypes });
+  }
+
+  async unsubscribeFromDataStream(streamTypes: string[]): Promise<any> {
+    return this.post('/api/stream/unsubscribe', { stream_types: streamTypes });
+  }
+
   // WebSocket connection info
   getWebSocketUrl(): string {
     const wsProtocol = API_BASE_URL.startsWith('https') ? 'wss' : 'ws';

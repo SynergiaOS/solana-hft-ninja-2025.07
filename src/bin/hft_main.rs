@@ -369,5 +369,9 @@ fn create_default_config() -> Config {
             rate_limit_rps: 1000,
         },
         wallet_tracker: None, // Disabled by default
+        oumi_ai: None, // Disabled by default
+        opensearch_ai: None, // Disabled by default
+        lmcache: None, // Disabled by default
+        ai: None, // Disabled by default
     }
 }

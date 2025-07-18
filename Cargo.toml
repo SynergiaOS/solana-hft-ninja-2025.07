@@ -42,6 +42,7 @@ tokio-tungstenite = "0.20"
 tungstenite = "0.20"
 reqwest = { version = "0.11", features = ["json", "rustls-tls"] }
 url = "2.5"
+redis = { version = "0.24", features = ["tokio-comp"] }
 
 # Metrics and monitoring
 prometheus = "0.13"

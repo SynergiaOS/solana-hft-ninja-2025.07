@@ -18,6 +18,10 @@ import AnalyticsPage from '@/pages/AnalyticsPage';
 import SystemPage from '@/pages/SystemPage';
 import SettingsPage from '@/pages/SettingsPage';
 import EnhancedAnalysisPage from '@/pages/EnhancedAnalysisPage';
+// 🆕 New AI & Memory Pages
+import AIMemoryPage from '@/pages/AIMemoryPage';
+import WebhookEventsPage from '@/pages/WebhookEventsPage';
+import PredictionsPage from '@/pages/PredictionsPage';
 
 // Hooks
 import { useBackendSync } from '@/hooks/useBackendSync';
@@ -64,6 +68,10 @@ function App() {
                 <Route path="strategies" element={<StrategiesPage />} />
                 <Route path="analytics" element={<AnalyticsPage />} />
                 <Route path="enhanced" element={<EnhancedAnalysisPage />} />
+                {/* 🆕 New AI & Memory Routes */}
+                <Route path="ai-memory" element={<AIMemoryPage />} />
+                <Route path="webhook-events" element={<WebhookEventsPage />} />
+                <Route path="predictions" element={<PredictionsPage />} />
                 <Route path="system" element={<SystemPage />} />
                 <Route path="settings" element={<SettingsPage />} />
               </Route>

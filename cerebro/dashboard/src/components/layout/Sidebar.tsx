@@ -11,6 +11,10 @@ import {
   ServerStackIcon,
   BeakerIcon,
   XMarkIcon,
+  // 🆕 New AI & Memory Icons
+  BrainIcon,
+  SparklesIcon,
+  WalletIcon,
 } from '@heroicons/react/24/outline';
 import { Brain } from 'lucide-react';
 import ConnectionStatus from '@/components/ui/ConnectionStatus';
@@ -24,6 +28,10 @@ const navigation = [
   { name: 'Trading', href: '/trading', icon: ChartBarIcon },
   { name: 'FinGPT AI', href: '/fingpt', icon: CpuChipIcon, badge: 'AI' },
   { name: 'Enhanced AI', href: '/enhanced', icon: Brain, badge: 'NEW' },
+  // 🆕 New AI & Memory Navigation
+  { name: 'AI Memory', href: '/ai-memory', icon: BrainIcon, badge: 'BETA' },
+  { name: 'Predictions', href: '/predictions', icon: SparklesIcon, badge: 'AI' },
+  { name: 'Webhook Events', href: '/webhook-events', icon: WalletIcon, badge: 'LIVE' },
   { name: 'Strategies', href: '/strategies', icon: BoltIcon },
   { name: 'Analytics', href: '/analytics', icon: ChartPieIcon },
   { name: 'System', href: '/system', icon: ServerStackIcon },
