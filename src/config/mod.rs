@@ -1,5 +1,7 @@
 use serde::{Deserialize, Serialize};
 use std::path::Path;
+use crate::strategies::wallet_tracker::WalletTrackerConfig;
+use crate::ai::{AIConfig, OumiConfig, OpenSearchConfig, IntegrationConfig};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Config {
@@ -10,6 +12,10 @@ pub struct Config {
     pub risk: RiskConfig,
     pub logging: LoggingConfig,
     pub monitoring: MonitoringConfig,
+    pub wallet_tracker: Option<WalletTrackerConfig>,
+    pub oumi_ai: Option<OumiConfig>,
+    pub opensearch_ai: Option<OpenSearchConfig>,
+    pub ai: Option<AIConfig>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -80,9 +86,9 @@ impl Config {
     pub fn load(config_path: &str) -> Result<Self, config::ConfigError> {
         let settings = config::Config::builder()
             .add_source(
-                config::File::with_name(&format!("{}/config", config_path))
+                config::File::with_name(config_path)
                     .format(config::FileFormat::Toml)
-                    .required(false)
+                    .required(true)
             )
             .add_source(config::Environment::with_prefix("SOLANA_HFT"))
             .build()?;

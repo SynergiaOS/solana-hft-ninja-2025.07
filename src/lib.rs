@@ -13,6 +13,7 @@ pub mod bridge;
 pub mod simple_engine;
 pub mod security;
 pub mod engine;
+pub mod ai;
 
 pub use config::Config;
 pub use bridge::*;
@@ -22,3 +23,4 @@ pub use strategies::*;
 pub use execution::*;
 pub use monitoring::*;
 pub use engine::*;
+pub use ai::*;

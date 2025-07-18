@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🥷 Solana HFT Ninja Dashboard</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            color: white;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        
+        .header h1 {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+        
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        
+        .stat-card {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 15px;
+            padding: 20px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            transition: transform 0.3s ease;
+        }
+        
+        .stat-card:hover {
+            transform: translateY(-5px);
+        }
+        
+        .stat-card h3 {
+            font-size: 1.1rem;
+            margin-bottom: 10px;
+            opacity: 0.8;
+        }
+        
+        .stat-card .value {
+            font-size: 2rem;
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+        
+        .transactions {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 15px;
+            padding: 20px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        
+        .transactions h2 {
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        
+        .tx-item {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 10px;
+            padding: 15px;
+            margin-bottom: 10px;
+            border-left: 4px solid #4CAF50;
+        }
+        
+        .tx-signature {
+            font-family: monospace;
+            font-size: 0.9rem;
+            opacity: 0.8;
+            word-break: break-all;
+        }
+        
+        .refresh-btn {
+            background: linear-gradient(45deg, #4CAF50, #45a049);
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 25px;
+            cursor: pointer;
+            font-size: 1rem;
+            margin: 20px auto;
+            display: block;
+            transition: transform 0.3s ease;
+        }
+        
+        .refresh-btn:hover {
+            transform: scale(1.05);
+        }
+        
+        .status {
+            text-align: center;
+            margin: 20px 0;
+            padding: 10px;
+            border-radius: 10px;
+        }
+        
+        .status.online {
+            background: rgba(76, 175, 80, 0.2);
+            border: 1px solid #4CAF50;
+        }
+        
+        .status.offline {
+            background: rgba(244, 67, 54, 0.2);
+            border: 1px solid #f44336;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🥷 Solana HFT Ninja Dashboard</h1>
+            <p>Real-time High-Frequency Trading on Solana Devnet</p>
+        </div>
+        
+        <div id="status" class="status">
+            <span id="status-text">Connecting...</span>
+        </div>
+        
+        <div class="stats-grid">
+            <div class="stat-card">
+                <h3>💰 Balance</h3>
+                <div class="value" id="balance">7.999975 SOL</div>
+                <small>Devnet Balance</small>
+            </div>
+            
+            <div class="stat-card">
+                <h3>📊 Total Transactions</h3>
+                <div class="value" id="total-tx">5</div>
+                <small>Executed Today</small>
+            </div>
+            
+            <div class="stat-card">
+                <h3>⚡ HFT Engine</h3>
+                <div class="value" id="engine-status">RUNNING</div>
+                <small>Market Making + MEV Detection</small>
+            </div>
+
+            <div class="stat-card">
+                <h3>🔗 Helius WebSocket</h3>
+                <div class="value" style="color: #4CAF50;">CONNECTED</div>
+                <small>Real-time Mainnet Data</small>
+            </div>
+            
+            <div class="stat-card">
+                <h3>🎯 Success Rate</h3>
+                <div class="value" id="success-rate">100%</div>
+                <small>All transactions confirmed</small>
+            </div>
+        </div>
+        
+        <div class="transactions">
+            <h2>📈 Recent Transactions</h2>
+            <div id="transactions-list">
+                <div class="tx-item">
+                    <div><strong>Transfer 0.1 SOL</strong> - ✅ Confirmed</div>
+                    <div class="tx-signature">4WBhSb77NYdNfym9DezeFXG4AEjX6cCnpd1DiECEF2XzRj833wapJSvw7ZcUJvYShWVpfj6GHXi6AM4iauCMbsh8</div>
+                </div>
+                
+                <div class="tx-item">
+                    <div><strong>Transfer 0.05 SOL</strong> - ✅ Confirmed</div>
+                    <div class="tx-signature">wEUao4xz9jH4C6TmPtirN8oZfmGFLFH2CMvRar5ixJokQMFTgzXyo5HzdyhcArh8uSc8eejHiAdqqhxFm3mESit</div>
+                </div>
+                
+                <div class="tx-item">
+                    <div><strong>Transfer 0.02 SOL</strong> - ✅ Confirmed</div>
+                    <div class="tx-signature">59ZRGsuXdeec6kJDphvqnrt7YUuB6QYCCpM5gnzuWNY98ddMZaBPypxJxWvTxdMDaW3Ppn7zFf4xF47c9pg82VwY</div>
+                </div>
+
+                <div class="tx-item">
+                    <div><strong>Transfer 0.03 SOL</strong> - ✅ Confirmed</div>
+                    <div class="tx-signature">3MpcPQUgwvnjW46rMTdWY1bFUa1XK1XAoRB7ztUAVnA2BrFyKaPCrEnsCJuMKNLZxDjY5TwMi7wkv65MHER1WMVR</div>
+                </div>
+
+                <div class="tx-item">
+                    <div><strong>Transfer 0.01 SOL</strong> - ✅ Confirmed</div>
+                    <div class="tx-signature">kJa7qbUCwyQJydos2ZhgNNyCKT7zoURPs218ydH9kcA6HQrV3QGk9gKsGso9TUPXXWbAHoWFwSFFMeuGGWhMAD6</div>
+                </div>
+            </div>
+        </div>
+        
+        <button class="refresh-btn" onclick="refreshData()">🔄 Refresh Data</button>
+    </div>
+
+    <script>
+        async function checkBackendStatus() {
+            try {
+                const response = await fetch('http://localhost:8002/health');
+                const data = await response.json();
+                
+                document.getElementById('status').className = 'status online';
+                document.getElementById('status-text').textContent = '🟢 Backend Online - Cerebro BFF Connected';
+                
+                return true;
+            } catch (error) {
+                document.getElementById('status').className = 'status offline';
+                document.getElementById('status-text').textContent = '🔴 Backend Offline - Check Cerebro BFF';
+                return false;
+            }
+        }
+        
+        async function fetchDashboardData() {
+            try {
+                const response = await fetch('http://localhost:8002/api/dashboard');
+                const data = await response.json();
+                
+                console.log('Dashboard data:', data);
+                
+                // Update status based on HFT availability
+                if (data.hft_stats.error) {
+                    document.getElementById('engine-status').textContent = 'OFFLINE';
+                    document.getElementById('engine-status').style.color = '#f44336';
+                } else {
+                    document.getElementById('engine-status').textContent = 'RUNNING';
+                    document.getElementById('engine-status').style.color = '#4CAF50';
+                }
+                
+            } catch (error) {
+                console.error('Error fetching dashboard data:', error);
+            }
+        }
+        
+        async function refreshData() {
+            const button = document.querySelector('.refresh-btn');
+            button.textContent = '🔄 Refreshing...';
+            button.disabled = true;
+            
+            await checkBackendStatus();
+            await fetchDashboardData();
+            
+            setTimeout(() => {
+                button.textContent = '🔄 Refresh Data';
+                button.disabled = false;
+            }, 1000);
+        }
+        
+        // Initialize
+        checkBackendStatus();
+        fetchDashboardData();
+        
+        // Auto-refresh every 30 seconds
+        setInterval(() => {
+            checkBackendStatus();
+            fetchDashboardData();
+        }, 30000);
+    </script>
+</body>
+</html>

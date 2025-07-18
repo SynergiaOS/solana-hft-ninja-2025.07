@@ -6,6 +6,12 @@ rpc_url = "https://api.devnet.solana.com"
 ws_url = "wss://api.devnet.solana.com"
 rpc_timeout_ms = 10000
 
+[helius]
+api_key = "edbcd361-78a0-4998-bd1e-8d4666722f82"
+rpc_url = "https://devnet.helius-rpc.com/?api-key=edbcd361-78a0-4998-bd1e-8d4666722f82"
+ws_url = "wss://devnet.helius-rpc.com/?api-key=edbcd361-78a0-4998-bd1e-8d4666722f82"
+enable_mempool = true
+
 [wallet]
 private_key_path = "config/wallet.json"
 keypair_path = "config/wallet.json"
@@ -18,7 +24,7 @@ min_profit_threshold_bps = 50  # 0.5%
 risk_limit_bps = 500  # 5%
 
 [strategy]
-strategy_mode = "sandwich"
+strategy_mode = "market_making"
 update_interval_ms = 100
 order_book_depth = 20
 spread_bps = 10  # 0.1%
@@ -39,3 +45,99 @@ metrics_port = 8080
 health_check_interval_ms = 30000
 enable_ddos_protection = true
 rate_limit_rps = 100
+
+# 🔍 Wallet Tracker Strategy - Developer Following
+[wallet_tracker]
+enabled = true
+scan_interval_ms = 30000  # Co 30 sekund
+depth_level = 3           # 3 poziomy powiązań
+min_success_rate = 0.65   # Tylko developerzy z 65% sukcesem
+fresh_wallet_cap = 0.3    # Max 30% kapitału na nowe portfele
+min_liquidity_sol = 5.0   # 5 SOL płynności minimum
+max_creator_share = 0.2   # Max 20% supply u twórcy
+risk_model = "xgboost_v3"
+risk_update_interval_ms = 21600000  # 6h
+
+# Target wallets to track (successful devs)
+tracked_wallets = [
+    "EEC7mX2cut2JMGP3soancH2HNMKTw4Q7ADbCfDQFgggs",  # Your 25$ wallet
+    "DSJXCqXuRckDhSX34oiFgEQChuezxvVgkEAyaA2MML8X"   # Our main wallet
+]
+
+# Risk thresholds
+max_rug_score = 0.15
+min_behavior_score = 0.85
+max_suspicious_connections = 3
+min_holder_count = 50
+
+# Position sizing
+base_position_sol = 0.1
+max_position_sol = 0.5
+risk_multiplier = 2.0
+
+# 🧠 OUMI AI Integration - Advanced AI Framework
+[oumi_ai]
+enabled = true
+model_path = "models/oumi-trading-v1"
+inference_mode = "real_time"
+batch_size = 32
+max_sequence_length = 512
+temperature = 0.7
+top_p = 0.9
+fine_tuning_enabled = true
+training_data_path = "data/trading_patterns"
+model_update_interval_hours = 24
+
+# Model capabilities
+multi_modal = true
+text_analysis = true
+price_prediction = true
+sentiment_analysis = true
+risk_assessment = true
+
+# Performance settings
+gpu_acceleration = true
+quantization = "int8"
+memory_optimization = true
+parallel_inference = true
+
+# 🔍 OpenSearch AI Integration - Intelligent Search & Analytics
+[opensearch_ai]
+enabled = true
+endpoint = "http://localhost:9200"
+index_prefix = "hft_ninja"
+vector_dimensions = 768
+similarity_algorithm = "cosine"
+refresh_interval = "1s"
+
+# Indices configuration
+[opensearch_ai.indices]
+market_patterns = "hft_ninja_patterns"
+wallet_behaviors = "hft_ninja_wallets"
+price_movements = "hft_ninja_prices"
+transaction_flows = "hft_ninja_transactions"
+mev_opportunities = "hft_ninja_mev"
+
+# Vector search settings
+[opensearch_ai.vector_search]
+enabled = true
+embedding_model = "sentence-transformers/all-MiniLM-L6-v2"
+search_timeout_ms = 100
+max_results = 50
+min_score = 0.7
+
+# Real-time analytics
+[opensearch_ai.analytics]
+anomaly_detection = true
+trend_analysis = true
+correlation_analysis = true
+predictive_modeling = true
+real_time_alerts = true
+
+# Performance optimization
+[opensearch_ai.performance]
+bulk_size = 1000
+flush_interval_ms = 5000
+refresh_policy = "wait_for"
+replica_count = 0
+shard_count = 1

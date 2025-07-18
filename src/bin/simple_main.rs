@@ -154,5 +154,6 @@ fn create_default_config() -> Config {
             enable_ddos_protection: false,
             rate_limit_rps: 100,
         },
+        wallet_tracker: None, // Disabled by default
     }
 }

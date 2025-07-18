@@ -104,6 +104,7 @@ async fn main() -> Result<()> {
                 enable_ddos_protection: false,
                 rate_limit_rps: 1000,
             },
+            wallet_tracker: None, // Disabled by default
         }
     });
 
