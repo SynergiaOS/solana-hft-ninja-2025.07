@@ -1,0 +1,171 @@
+# Solana HFT Ninja ARM64 Dockerfile for Oracle Free Tier
+# Optimized for ARM Ampere architecture with minimal resource usage
+# Target: 2 GB RAM usage on 24 GB Oracle Free Tier instance
+
+# Use official Rust image with ARM64 support
+FROM rust:1.75-slim-bullseye as builder
+
+# Set platform and architecture
+ARG BUILDPLATFORM=linux/arm64
+ARG TARGETPLATFORM=linux/arm64
+
+# ARM64 optimization flags
+ENV ARM_OPTIMIZATION=1
+ENV NEON_OPTIMIZATION=1
+ENV ARM64_SIMD=1
+
+# Rust optimization flags for ARM64
+ENV RUSTFLAGS="-C target-cpu=native -C opt-level=3 -C codegen-units=1 -C panic=abort"
+ENV CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER=aarch64-linux-gnu-gcc
+
+# Install build dependencies for ARM64
+RUN apt-get update && apt-get install -y \
+    pkg-config \
+    libssl-dev \
+    libclang-dev \
+    build-essential \
+    cmake \
+    git \
+    curl \
+    wget \
+    libudev-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+# Set working directory
+WORKDIR /app
+
+# Copy Cargo files for dependency caching
+COPY Cargo.toml Cargo.lock ./
+
+# Create dummy main.rs for dependency compilation
+RUN mkdir src && echo "fn main() {}" > src/main.rs
+
+# Build dependencies (cached layer)
+RUN cargo build --release --target aarch64-unknown-linux-gnu && \
+    rm -rf src target/aarch64-unknown-linux-gnu/release/deps/solana_hft_ninja*
+
+# Copy source code
+COPY src/ ./src/
+COPY config/ ./config/
+
+# Build the application with ARM64 optimizations
+RUN cargo build --release --target aarch64-unknown-linux-gnu
+
+# Runtime stage - minimal ARM64 image
+FROM debian:bullseye-slim
+
+# Install runtime dependencies
+RUN apt-get update && apt-get install -y \
+    ca-certificates \
+    libssl1.1 \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Create app user
+RUN useradd -r -s /bin/false hft-ninja
+
+# Set working directory
+WORKDIR /app
+
+# Copy binary from builder
+COPY --from=builder /app/target/aarch64-unknown-linux-gnu/release/solana-hft-ninja-2025-07 ./hft-ninja
+
+# Copy configuration
+COPY --from=builder /app/config/ ./config/
+
+# Create necessary directories
+RUN mkdir -p logs data cache && \
+    chown -R hft-ninja:hft-ninja /app
+
+# ARM64 runtime optimizations
+ENV ARM_OPTIMIZATION=1
+ENV NEON_OPTIMIZATION=1
+ENV OMP_NUM_THREADS=2
+ENV RAYON_NUM_THREADS=2
+
+# Application configuration
+ENV RUST_LOG=info
+ENV RUST_BACKTRACE=1
+ENV CONFIG_PATH=/app/config/config.toml
+
+# Oracle Free Tier resource limits
+ENV MEMORY_LIMIT=2G
+ENV CPU_LIMIT=1.5
+
+# Solana configuration
+ENV SOLANA_RPC_URL=https://api.devnet.solana.com
+ENV SOLANA_WS_URL=wss://api.devnet.solana.com
+
+# Performance tuning for ARM64
+ENV MALLOC_ARENA_MAX=2
+ENV MALLOC_MMAP_THRESHOLD_=131072
+ENV MALLOC_TRIM_THRESHOLD_=131072
+
+# Create startup script with ARM64 optimizations
+RUN cat > /app/start-arm64.sh << 'EOF'
+#!/bin/bash
+
+# ARM64 performance optimizations
+echo "Setting up ARM64 optimizations for HFT Ninja..."
+
+# CPU affinity for ARM cores
+export OMP_NUM_THREADS=2
+export RAYON_NUM_THREADS=2
+
+# ARM NEON optimizations
+export ARM_COMPUTE_LIBRARY=1
+export NEON_OPTIMIZATION=1
+
+# Memory optimizations for 2GB limit
+export MALLOC_ARENA_MAX=2
+export MALLOC_MMAP_THRESHOLD_=131072
+export MALLOC_TRIM_THRESHOLD_=131072
+
+# Rust-specific optimizations
+export RUST_MIN_STACK=2097152
+export RUST_LOG=info
+
+# Check configuration
+if [ ! -f "/app/config/config.toml" ]; then
+    echo "Warning: config.toml not found, using default configuration"
+    if [ -f "/app/config/config.toml.example" ]; then
+        cp /app/config/config.toml.example /app/config/config.toml
+    fi
+fi
+
+# Start the application
+echo "Starting Solana HFT Ninja ARM64..."
+exec /app/hft-ninja
+EOF
+
+RUN chmod +x /app/start-arm64.sh
+
+# Health check script
+RUN cat > /app/health-check.sh << 'EOF'
+#!/bin/bash
+curl -f http://localhost:8080/health || exit 1
+EOF
+
+RUN chmod +x /app/health-check.sh
+
+# Switch to app user
+USER hft-ninja
+
+# Expose port
+EXPOSE 8080
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+    CMD /app/health-check.sh
+
+# Use ARM64 optimized startup
+CMD ["/app/start-arm64.sh"]
+
+# Metadata
+LABEL maintainer="Solana HFT Ninja Team"
+LABEL description="Solana HFT Ninja ARM64 optimized for Oracle Free Tier"
+LABEL version="2025.07.18"
+LABEL architecture="arm64"
+LABEL oracle.free-tier="true"
+LABEL memory.limit="2GB"
+LABEL cpu.limit="1.5"
