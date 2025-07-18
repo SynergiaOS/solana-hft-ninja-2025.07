@@ -1,0 +1,538 @@
+# =========================================================================
+#  🔒 Security-Hardened Caddy Configuration for Solana HFT Ninja
+#  Enterprise-grade security with advanced threat protection
+# =========================================================================
+
+# Global security configuration
+{
+    email admin@hft-ninja.com
+    admin localhost:2019
+    
+    # Enhanced logging with security events
+    log {
+        output file /var/log/caddy/security.log {
+            roll_size 100mb
+            roll_keep 10
+            roll_keep_for 2160h  # 90 days
+        }
+        format json
+        level INFO
+        include http.request.headers.User-Agent
+        include http.request.headers.X-Forwarded-For
+        include http.request.headers.X-Real-IP
+    }
+    
+    # Security plugins (if available)
+    order security first
+    order rate_limit before reverse_proxy
+    
+    # Global security settings
+    servers {
+        timeouts {
+            read_timeout 30s
+            read_header_timeout 10s
+            write_timeout 30s
+            idle_timeout 120s
+        }
+        max_header_size 16KB
+    }
+}
+
+# =============================================================================
+# 🛡️ Security Snippets (Reusable)
+# =============================================================================
+(security_headers) {
+    header {
+        # HSTS with preload
+        Strict-Transport-Security "max-age=63072000; includeSubDomains; preload"
+        
+        # XSS Protection
+        X-Content-Type-Options "nosniff"
+        X-Frame-Options "DENY"
+        X-XSS-Protection "1; mode=block"
+        
+        # CSP for API (strict)
+        Content-Security-Policy "default-src 'none'; frame-ancestors 'none'; base-uri 'none'; form-action 'none';"
+        
+        # Additional security headers
+        Referrer-Policy "strict-origin-when-cross-origin"
+        Permissions-Policy "geolocation=(), microphone=(), camera=(), payment=(), usb=(), magnetometer=(), gyroscope=(), accelerometer=()"
+        Cross-Origin-Embedder-Policy "require-corp"
+        Cross-Origin-Opener-Policy "same-origin"
+        Cross-Origin-Resource-Policy "same-origin"
+        
+        # Remove server information
+        -Server
+        -X-Powered-By
+        
+        # Custom security headers
+        X-API-Version "2025.07"
+        X-Security-Level "Maximum"
+        X-Content-Security-Policy "default-src 'none'"
+    }
+}
+
+(rate_limiting) {
+    rate_limit {
+        zone {args[0]}
+        key {remote_ip}
+        window {args[1]}
+        max_requests {args[2]}
+        deny_status 429
+    }
+}
+
+(ip_filtering) {
+    @blocked_ips {
+        # Block known malicious IPs (example ranges)
+        remote_ip 192.0.2.0/24 198.51.100.0/24 203.0.113.0/24
+        # Add more malicious IP ranges here
+    }
+    
+    handle @blocked_ips {
+        respond "Access denied" 403
+    }
+}
+
+(geo_blocking) {
+    @blocked_countries {
+        # Block specific countries if needed (example)
+        header CF-IPCountry CN RU KP IR
+    }
+    
+    handle @blocked_countries {
+        respond "Geographic access restricted" 403
+    }
+}
+
+(attack_protection) {
+    # Block common attack patterns
+    @malicious_requests {
+        # SQL Injection patterns
+        query *union*select* *drop*table* *insert*into* *delete*from*
+        path *union*select* *drop*table* *insert*into* *delete*from*
+        
+        # XSS patterns
+        query *<script* *javascript:* *onload=* *onerror=*
+        path *<script* *javascript:* *onload=* *onerror=*
+        
+        # Path traversal
+        path *../* *..\\* *%2e%2e* *%252e%252e*
+        
+        # Command injection
+        query *;cat* *;ls* *;wget* *;curl* *|cat* *|ls*
+        path *;cat* *;ls* *;wget* *;curl* *|cat* *|ls*
+        
+        # File inclusion
+        path *php://input* *file://* *data://* *expect://*
+        
+        # Suspicious user agents
+        header User-Agent *sqlmap* *nikto* *nmap* *masscan* *zap* *burp*
+        header User-Agent *bot* *crawler* *spider* *scraper* *scanner*
+        
+        # Empty or suspicious user agents
+        header User-Agent ""
+        header User-Agent "-"
+        header User-Agent "Mozilla/4.0"
+        header User-Agent "curl*"
+        header User-Agent "wget*"
+        header User-Agent "python*"
+        header User-Agent "Go-http-client*"
+    }
+    
+    handle @malicious_requests {
+        respond "Security violation detected" 403
+    }
+}
+
+(request_validation) {
+    # Validate request size
+    @oversized_request {
+        header Content-Length >1048576  # 1MB limit
+    }
+    
+    handle @oversized_request {
+        respond "Request too large" 413
+    }
+    
+    # Validate content type for POST requests
+    @invalid_content_type {
+        method POST PUT PATCH
+        not header Content-Type application/json*
+        not header Content-Type application/x-www-form-urlencoded*
+        not header Content-Type multipart/form-data*
+    }
+    
+    handle @invalid_content_type {
+        respond "Invalid content type" 415
+    }
+}
+
+# =============================================================================
+# 🚀 Secure API Domain - api.hft-ninja.com
+# =============================================================================
+api.hft-ninja.com {
+    # Import security configurations
+    import security_headers
+    import ip_filtering
+    import geo_blocking
+    import attack_protection
+    import request_validation
+    
+    # TLS configuration
+    tls {
+        protocols tls1.2 tls1.3
+        ciphers TLS_AES_256_GCM_SHA384 TLS_CHACHA20_POLY1305_SHA256 TLS_AES_128_GCM_SHA256
+        curves x25519 secp384r1 secp256r1
+        alpn h2 http/1.1
+    }
+    
+    # ==========================================================================
+    # 🧮 AI Endpoints - Maximum Security
+    # ==========================================================================
+    @ai_endpoints {
+        path /ai/calculate/*
+    }
+    
+    handle @ai_endpoints {
+        # Strict rate limiting for AI (expensive operations)
+        import rate_limiting ai_zone 1m 5
+        
+        # Additional AI-specific security
+        @ai_security {
+            method POST
+            header Content-Type application/json*
+            header Content-Length <10240  # 10KB limit for AI requests
+        }
+        
+        handle @ai_security {
+            # Request logging for AI endpoints
+            log {
+                output file /var/log/caddy/ai_requests.log
+                format json
+                level INFO
+            }
+            
+            # Add AI-specific headers
+            header {
+                X-AI-Rate-Limit "5 requests per minute"
+                X-AI-Cost-Warning "This endpoint consumes AI credits"
+            }
+            
+            # Proxy to AI service with enhanced security
+            reverse_proxy localhost:8003 {
+                # Health monitoring
+                health_uri /health
+                health_interval 30s
+                health_timeout 10s
+                health_status 200
+                
+                # Security headers to backend
+                header_up X-Real-IP {remote_ip}
+                header_up X-Forwarded-For {remote_ip}
+                header_up X-Forwarded-Proto {scheme}
+                header_up X-Request-ID {uuid}
+                header_up X-Security-Level "Maximum"
+                
+                # Remove sensitive headers from response
+                header_down -X-Powered-By
+                header_down -Server
+                
+                # Timeouts for AI operations
+                transport http {
+                    dial_timeout 5s
+                    response_header_timeout 30s
+                    read_timeout 60s
+                    write_timeout 30s
+                    max_idle_conns 10
+                    max_conns_per_host 5
+                }
+            }
+        }
+        
+        # Block non-compliant AI requests
+        handle {
+            respond "Invalid AI request format" 400
+        }
+    }
+    
+    # ==========================================================================
+    # 📊 BFF API Endpoints - High Security
+    # ==========================================================================
+    @bff_endpoints {
+        path /api/*
+    }
+    
+    handle @bff_endpoints {
+        # Rate limiting for BFF
+        import rate_limiting api_zone 1m 50
+        
+        # BFF-specific security
+        @bff_security {
+            not path /api/auth/login  # Allow higher limits for auth
+        }
+        
+        handle @bff_security {
+            # Additional rate limiting for non-auth endpoints
+            rate_limit {
+                zone bff_zone
+                key {remote_ip}
+                window 10s
+                max_requests 10
+                deny_status 429
+            }
+        }
+        
+        # Proxy to BFF with security
+        reverse_proxy localhost:8002 {
+            health_uri /health
+            health_interval 15s
+            health_timeout 5s
+            
+            # Security headers
+            header_up X-Real-IP {remote_ip}
+            header_up X-Forwarded-For {remote_ip}
+            header_up X-Forwarded-Proto {scheme}
+            header_up X-Request-ID {uuid}
+            header_up X-Security-Level "High"
+            
+            # Response security
+            header_down -X-Powered-By
+            header_down -Server
+            
+            transport http {
+                dial_timeout 3s
+                response_header_timeout 10s
+                read_timeout 30s
+                write_timeout 10s
+                max_idle_conns 20
+                max_conns_per_host 10
+            }
+        }
+    }
+    
+    # ==========================================================================
+    # 🏥 Health Endpoints - Monitored Access
+    # ==========================================================================
+    @health_endpoints {
+        path /health
+        path /status
+        path /ping
+    }
+    
+    handle @health_endpoints {
+        # Light rate limiting for health checks
+        import rate_limiting health_zone 1m 30
+        
+        # Health check logging
+        log {
+            output file /var/log/caddy/health_checks.log
+            format json
+            level INFO
+        }
+        
+        # Try BFF health, fallback to local
+        reverse_proxy localhost:8002 {
+            health_uri /health
+            health_interval 10s
+            health_timeout 3s
+            
+            header_up X-Health-Check "true"
+            header_up X-Request-ID {uuid}
+            
+            transport http {
+                dial_timeout 1s
+                response_header_timeout 3s
+                read_timeout 5s
+                write_timeout 3s
+            }
+        }
+        
+        # Fallback health response
+        handle_errors {
+            respond `{
+                "status": "healthy",
+                "service": "caddy-gateway",
+                "timestamp": "{time.now.unix}",
+                "version": "2025.07",
+                "security_level": "maximum"
+            }` 200 {
+                header Content-Type application/json
+                header X-Health-Source "caddy-fallback"
+            }
+        }
+    }
+    
+    # ==========================================================================
+    # 📈 Metrics - Restricted Access
+    # ==========================================================================
+    @metrics {
+        path /metrics
+    }
+    
+    handle @metrics {
+        # Strict IP whitelist for metrics
+        @metrics_allowed {
+            remote_ip 127.0.0.1/8 10.0.0.0/8 172.16.0.0/12 192.168.0.0/16
+        }
+        
+        handle @metrics_allowed {
+            # Rate limiting for metrics
+            rate_limit {
+                zone metrics_zone
+                key {remote_ip}
+                window 1m
+                max_requests 10
+                deny_status 429
+            }
+            
+            # Metrics endpoint
+            metrics /metrics
+            
+            # Add security headers
+            header X-Metrics-Access "authorized"
+        }
+        
+        # Block external access
+        handle {
+            respond "Metrics access denied" 403
+        }
+    }
+    
+    # ==========================================================================
+    # 🚫 Security Blocks
+    # ==========================================================================
+    
+    # Block malicious file extensions
+    @blocked_extensions {
+        path *.php *.asp *.aspx *.jsp *.cgi *.pl *.py *.rb *.sh *.bat *.cmd
+    }
+    
+    handle @blocked_extensions {
+        respond "File type not allowed" 403
+    }
+    
+    # Block sensitive paths
+    @blocked_paths {
+        path /.env* /.git* /.svn* /.hg* /.bzr*
+        path /wp-admin* /wp-content* /wp-includes*
+        path /admin* /administrator* /phpmyadmin*
+        path /config* /database* /backup*
+        path /.well-known/security.txt
+    }
+    
+    handle @blocked_paths {
+        respond "Path not found" 404
+    }
+    
+    # Block HTTP methods
+    @blocked_methods {
+        method TRACE TRACK CONNECT OPTIONS
+    }
+    
+    handle @blocked_methods {
+        respond "Method not allowed" 405
+    }
+    
+    # ==========================================================================
+    # 🔄 Default Handler with Security
+    # ==========================================================================
+    handle {
+        # Log unhandled requests
+        log {
+            output file /var/log/caddy/unhandled_requests.log
+            format json
+            level WARN
+        }
+        
+        respond `{
+            "error": "Not Found",
+            "message": "API endpoint not found",
+            "security_notice": "This request has been logged",
+            "available_endpoints": [
+                "/health - Health check",
+                "/api/* - General API endpoints",
+                "/ai/calculate/* - AI calculation endpoints"
+            ]
+        }` 404 {
+            header Content-Type application/json
+            header X-Security-Response "true"
+        }
+    }
+    
+    # Enhanced error handling
+    handle_errors {
+        @security_errors expression `{err.status_code} == 403 || {err.status_code} == 429`
+        handle @security_errors {
+            # Log security events
+            log {
+                output file /var/log/caddy/security_events.log
+                format json
+                level WARN
+            }
+            
+            respond `{
+                "error": "Security Policy Violation",
+                "message": "Request blocked by security policy",
+                "status_code": {err.status_code},
+                "timestamp": "{time.now.unix}",
+                "request_id": "{uuid}"
+            }` {err.status_code} {
+                header Content-Type application/json
+                header X-Security-Block "true"
+            }
+        }
+        
+        @server_errors expression `{err.status_code} >= 500`
+        handle @server_errors {
+            respond `{
+                "error": "Internal Server Error",
+                "message": "Service temporarily unavailable",
+                "timestamp": "{time.now.unix}",
+                "request_id": "{uuid}"
+            }` 500 {
+                header Content-Type application/json
+                header X-Error-Type "server"
+            }
+        }
+        
+        # Default error handler
+        handle {
+            respond `{
+                "error": "Client Error",
+                "message": "Invalid request",
+                "status_code": {err.status_code},
+                "timestamp": "{time.now.unix}"
+            }` {err.status_code} {
+                header Content-Type application/json
+            }
+        }
+    }
+}
+
+# =============================================================================
+# 🌐 Frontend Domain with Security
+# =============================================================================
+hft-ninja.com, www.hft-ninja.com {
+    # Basic security for frontend
+    import security_headers
+    import ip_filtering
+    import attack_protection
+    
+    # Frontend-specific CSP
+    header Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' https://static.cloudflareinsights.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; connect-src 'self' https://api.hft-ninja.com; font-src 'self'; frame-ancestors 'none';"
+    
+    # Rate limiting for frontend
+    import rate_limiting frontend_zone 1m 100
+    
+    # Serve frontend
+    reverse_proxy localhost:3000 {
+        health_uri /
+        health_interval 30s
+        health_timeout 5s
+        
+        header_up X-Real-IP {remote_ip}
+        header_up X-Forwarded-For {remote_ip}
+        header_up X-Forwarded-Proto {scheme}
+    }
+}

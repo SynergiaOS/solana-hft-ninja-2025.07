@@ -1,0 +1,381 @@
+# =========================================================================
+#  🛡️ Caddy v2 Configuration for Solana HFT Ninja API Gateway
+#  Zero-cost reverse proxy with automatic HTTPS and advanced security
+# =========================================================================
+
+# Global options
+{
+    # Email for Let's Encrypt certificates
+    email admin@hft-ninja.com
+    
+    # Enable admin API for metrics
+    admin localhost:2019
+    
+    # Log configuration
+    log {
+        output file /var/log/caddy/access.log {
+            roll_size 100mb
+            roll_keep 5
+            roll_keep_for 720h
+        }
+        format json
+        level INFO
+    }
+    
+    # Enable experimental features
+    experimental_http3
+}
+
+# =============================================================================
+# 🚀 Main API Domain - api.hft-ninja.com
+# =============================================================================
+api.hft-ninja.com {
+    # Automatic HTTPS with Let's Encrypt
+    tls {
+        protocols tls1.2 tls1.3
+    }
+    
+    # Security headers
+    header {
+        # HSTS
+        Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+        
+        # XSS Protection
+        X-Content-Type-Options "nosniff"
+        X-Frame-Options "DENY"
+        X-XSS-Protection "1; mode=block"
+        
+        # CSP for API
+        Content-Security-Policy "default-src 'none'; frame-ancestors 'none';"
+        
+        # Additional security
+        Referrer-Policy "strict-origin-when-cross-origin"
+        Permissions-Policy "geolocation=(), microphone=(), camera=()"
+        
+        # Remove server info
+        -Server
+        
+        # Add custom headers
+        X-API-Version "2025.07"
+        X-Powered-By "Solana-HFT-Ninja"
+    }
+    
+    # ==========================================================================
+    # 🧮 AI Calculation Endpoints - High Security + Rate Limiting
+    # ==========================================================================
+    @ai_endpoints {
+        path /ai/calculate/*
+    }
+    
+    handle @ai_endpoints {
+        # Strict rate limiting for AI endpoints (expensive operations)
+        rate_limit {
+            zone ai_zone
+            key {remote_ip}
+            window 1m
+            max_requests 10
+            deny_status 429
+        }
+        
+        # Additional validation
+        @valid_ai_request {
+            method POST
+            header Content-Type application/json
+        }
+        
+        handle @valid_ai_request {
+            # Log AI requests
+            log {
+                output file /var/log/caddy/ai_requests.log
+                format json
+                level INFO
+            }
+            
+            # Proxy to DeepSeek-Math AI service
+            reverse_proxy localhost:8003 {
+                # Health check
+                health_uri /health
+                health_interval 30s
+                health_timeout 10s
+                
+                # Load balancing (for future scaling)
+                lb_policy round_robin
+                
+                # Timeouts for AI operations
+                transport http {
+                    dial_timeout 5s
+                    response_header_timeout 30s
+                    read_timeout 60s
+                    write_timeout 30s
+                }
+                
+                # Headers to backend
+                header_up X-Real-IP {remote_ip}
+                header_up X-Forwarded-For {remote_ip}
+                header_up X-Forwarded-Proto {scheme}
+                header_up X-Request-ID {uuid}
+            }
+        }
+        
+        # Block non-POST requests to AI endpoints
+        handle {
+            respond "Method not allowed for AI endpoints" 405
+        }
+    }
+    
+    # ==========================================================================
+    # 📊 BFF API Endpoints - Medium Security
+    # ==========================================================================
+    @bff_endpoints {
+        path /api/*
+    }
+    
+    handle @bff_endpoints {
+        # Rate limiting for general API
+        rate_limit {
+            zone api_zone
+            key {remote_ip}
+            window 1m
+            max_requests 100
+            deny_status 429
+        }
+        
+        # Proxy to Cerebro BFF
+        reverse_proxy localhost:8002 {
+            # Health check
+            health_uri /health
+            health_interval 15s
+            health_timeout 5s
+            
+            # Standard timeouts
+            transport http {
+                dial_timeout 3s
+                response_header_timeout 10s
+                read_timeout 30s
+                write_timeout 10s
+            }
+            
+            # Headers to backend
+            header_up X-Real-IP {remote_ip}
+            header_up X-Forwarded-For {remote_ip}
+            header_up X-Forwarded-Proto {scheme}
+            header_up X-Request-ID {uuid}
+        }
+    }
+    
+    # ==========================================================================
+    # 🏥 Health Check Endpoints - Public Access
+    # ==========================================================================
+    @health_endpoints {
+        path /health
+        path /status
+        path /ping
+    }
+    
+    handle @health_endpoints {
+        # Light rate limiting for health checks
+        rate_limit {
+            zone health_zone
+            key {remote_ip}
+            window 1m
+            max_requests 60
+            deny_status 429
+        }
+        
+        # Try BFF first, fallback to simple response
+        reverse_proxy localhost:8002 {
+            health_uri /health
+            health_interval 10s
+            health_timeout 3s
+            
+            # Quick timeouts for health checks
+            transport http {
+                dial_timeout 1s
+                response_header_timeout 3s
+                read_timeout 5s
+                write_timeout 3s
+            }
+        }
+        
+        # Fallback health response
+        handle_errors {
+            respond `{
+                "status": "healthy",
+                "service": "caddy-gateway",
+                "timestamp": "{time.now.unix}",
+                "version": "2025.07"
+            }` 200 {
+                header Content-Type application/json
+            }
+        }
+    }
+    
+    # ==========================================================================
+    # 📈 Metrics Endpoint - Restricted Access
+    # ==========================================================================
+    @metrics {
+        path /metrics
+    }
+    
+    handle @metrics {
+        # Restrict to local network only
+        @local_only {
+            remote_ip 127.0.0.1/8 10.0.0.0/8 172.16.0.0/12 192.168.0.0/16
+        }
+        
+        handle @local_only {
+            # Caddy metrics
+            metrics /metrics
+        }
+        
+        # Block external access to metrics
+        handle {
+            respond "Access denied" 403
+        }
+    }
+    
+    # ==========================================================================
+    # 🚫 Security: Block Common Attack Patterns
+    # ==========================================================================
+    @blocked_paths {
+        path /.env*
+        path /.git*
+        path /admin*
+        path /wp-admin*
+        path /phpmyadmin*
+        path *.php
+        path *.asp
+        path *.jsp
+    }
+    
+    handle @blocked_paths {
+        respond "Not found" 404
+    }
+    
+    # Block suspicious user agents
+    @blocked_agents {
+        header User-Agent *bot*
+        header User-Agent *crawler*
+        header User-Agent *spider*
+        header User-Agent *scanner*
+        header User-Agent *sqlmap*
+        header User-Agent *nikto*
+    }
+    
+    handle @blocked_agents {
+        respond "Access denied" 403
+    }
+    
+    # ==========================================================================
+    # 🔄 Default Handler - 404 for undefined routes
+    # ==========================================================================
+    handle {
+        respond `{
+            "error": "Not Found",
+            "message": "API endpoint not found",
+            "available_endpoints": [
+                "/health - Health check",
+                "/api/* - General API endpoints",
+                "/ai/calculate/* - AI calculation endpoints"
+            ]
+        }` 404 {
+            header Content-Type application/json
+        }
+    }
+    
+    # Error handling
+    handle_errors {
+        @5xx expression `{err.status_code} >= 500`
+        handle @5xx {
+            respond `{
+                "error": "Internal Server Error",
+                "message": "Service temporarily unavailable",
+                "timestamp": "{time.now.unix}"
+            }` 500 {
+                header Content-Type application/json
+            }
+        }
+        
+        @4xx expression `{err.status_code} >= 400 && {err.status_code} < 500`
+        handle @4xx {
+            respond `{
+                "error": "Client Error",
+                "message": "Invalid request",
+                "status_code": {err.status_code},
+                "timestamp": "{time.now.unix}"
+            }` {err.status_code} {
+                header Content-Type application/json
+            }
+        }
+    }
+}
+
+# =============================================================================
+# 🌐 Main Domain - hft-ninja.com (Frontend)
+# =============================================================================
+hft-ninja.com, www.hft-ninja.com {
+    # Automatic HTTPS
+    tls {
+        protocols tls1.2 tls1.3
+    }
+    
+    # Security headers for frontend
+    header {
+        Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+        X-Content-Type-Options "nosniff"
+        X-Frame-Options "SAMEORIGIN"
+        X-XSS-Protection "1; mode=block"
+        Referrer-Policy "strict-origin-when-cross-origin"
+        -Server
+    }
+    
+    # Rate limiting for frontend
+    rate_limit {
+        zone frontend_zone
+        key {remote_ip}
+        window 1m
+        max_requests 200
+        deny_status 429
+    }
+    
+    # Serve React frontend
+    reverse_proxy localhost:3000 {
+        health_uri /
+        health_interval 30s
+        health_timeout 5s
+        
+        header_up X-Real-IP {remote_ip}
+        header_up X-Forwarded-For {remote_ip}
+        header_up X-Forwarded-Proto {scheme}
+    }
+    
+    # Handle errors
+    handle_errors {
+        respond "Service temporarily unavailable" 503
+    }
+}
+
+# =============================================================================
+# 📊 Admin Dashboard - admin.hft-ninja.com (Optional)
+# =============================================================================
+admin.hft-ninja.com {
+    # Restrict to specific IPs (replace with your IPs)
+    @admin_access {
+        remote_ip 127.0.0.1/8 YOUR_IP_HERE
+    }
+    
+    handle @admin_access {
+        # Basic auth for additional security
+        basicauth {
+            admin $2a$14$hashed_password_here
+        }
+        
+        # Proxy to admin interface
+        reverse_proxy localhost:2019
+    }
+    
+    # Block all other access
+    handle {
+        respond "Access denied" 403
+    }
+}

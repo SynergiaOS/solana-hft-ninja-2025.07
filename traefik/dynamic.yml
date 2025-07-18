@@ -1,0 +1,263 @@
+# =========================================================================
+#  🐳 Traefik v3 Dynamic Configuration for Solana HFT Ninja
+#  Middlewares, services, and advanced routing rules
+# =========================================================================
+
+# HTTP Middlewares
+http:
+  middlewares:
+    # =======================================================================
+    # 🛡️ Security Headers Middleware
+    # =======================================================================
+    security-headers:
+      headers:
+        # HSTS
+        stsSeconds: 31536000
+        stsIncludeSubdomains: true
+        stsPreload: true
+        
+        # XSS Protection
+        browserXssFilter: true
+        contentTypeNosniff: true
+        frameDeny: true
+        
+        # CSP for API endpoints
+        contentSecurityPolicy: "default-src 'none'; frame-ancestors 'none';"
+        
+        # Additional security
+        referrerPolicy: "strict-origin-when-cross-origin"
+        permissionsPolicy: "geolocation=(), microphone=(), camera=()"
+        
+        # Custom headers
+        customRequestHeaders:
+          X-Forwarded-Proto: "https"
+        customResponseHeaders:
+          X-API-Version: "2025.07"
+          X-Powered-By: "Solana-HFT-Ninja"
+          Server: ""
+    
+    # =======================================================================
+    # 🚦 Rate Limiting Middlewares
+    # =======================================================================
+    rate-limit:
+      rateLimit:
+        average: 100
+        period: 1m
+        burst: 50
+        sourceCriterion:
+          ipStrategy:
+            depth: 1
+    
+    ai-rate-limit:
+      rateLimit:
+        average: 10
+        period: 1m
+        burst: 5
+        sourceCriterion:
+          ipStrategy:
+            depth: 1
+    
+    health-rate-limit:
+      rateLimit:
+        average: 60
+        period: 1m
+        burst: 20
+        sourceCriterion:
+          ipStrategy:
+            depth: 1
+    
+    frontend-rate-limit:
+      rateLimit:
+        average: 200
+        period: 1m
+        burst: 100
+        sourceCriterion:
+          ipStrategy:
+            depth: 1
+    
+    # =======================================================================
+    # 🔐 Authentication Middlewares
+    # =======================================================================
+    basic-auth:
+      basicAuth:
+        users:
+          # admin:admin123 (change this!)
+          - "admin:$2y$10$DLKjKQKQKQKQKQKQKQKQKe"
+    
+    # =======================================================================
+    # 🔄 Redirect Middlewares
+    # =======================================================================
+    www-redirect:
+      redirectRegex:
+        regex: "^https://www.hft-ninja.com/(.*)"
+        replacement: "https://hft-ninja.com/${1}"
+        permanent: true
+    
+    # =======================================================================
+    # 🛡️ IP Whitelist Middlewares (for admin endpoints)
+    # =======================================================================
+    admin-whitelist:
+      ipWhiteList:
+        sourceRange:
+          - "127.0.0.1/32"
+          - "10.0.0.0/8"
+          - "172.16.0.0/12"
+          - "192.168.0.0/16"
+          # Add your IP here
+          # - "YOUR_IP/32"
+    
+    # =======================================================================
+    # 🔧 Circuit Breaker Middleware
+    # =======================================================================
+    circuit-breaker:
+      circuitBreaker:
+        expression: "NetworkErrorRatio() > 0.3 || ResponseCodeRatio(500, 600, 0, 600) > 0.3"
+        checkPeriod: 10s
+        fallbackDuration: 30s
+        recoveryDuration: 10s
+    
+    # =======================================================================
+    # 📊 Retry Middleware
+    # =======================================================================
+    retry:
+      retry:
+        attempts: 3
+        initialInterval: 100ms
+    
+    # =======================================================================
+    # 🗜️ Compression Middleware
+    # =======================================================================
+    compression:
+      compress:
+        excludedContentTypes:
+          - "text/event-stream"
+          - "application/grpc"
+        minResponseBodyBytes: 1024
+    
+    # =======================================================================
+    # 📝 Request/Response Modification
+    # =======================================================================
+    strip-prefix-api:
+      stripPrefix:
+        prefixes:
+          - "/api"
+    
+    add-cors:
+      headers:
+        accessControlAllowMethods:
+          - GET
+          - POST
+          - PUT
+          - DELETE
+          - OPTIONS
+        accessControlAllowOriginList:
+          - "https://hft-ninja.com"
+          - "https://www.hft-ninja.com"
+        accessControlAllowHeaders:
+          - "Content-Type"
+          - "Authorization"
+          - "X-Requested-With"
+        accessControlExposeHeaders:
+          - "X-Request-ID"
+          - "X-API-Version"
+        accessControlAllowCredentials: true
+        accessControlMaxAge: 86400
+
+  # =========================================================================
+  # 🎯 Services Configuration
+  # =========================================================================
+  services:
+    # Fallback service for health checks
+    fallback-health:
+      loadBalancer:
+        servers:
+          - url: "http://127.0.0.1:8080"
+        healthCheck:
+          path: "/health"
+          interval: 30s
+          timeout: 5s
+    
+    # External services (if needed)
+    external-api:
+      loadBalancer:
+        servers:
+          - url: "https://api.external-service.com"
+        passHostHeader: false
+
+  # =========================================================================
+  # 🛣️ Additional Routers (File-based)
+  # =========================================================================
+  routers:
+    # =======================================================================
+    # 📊 Traefik Dashboard Router
+    # =======================================================================
+    traefik-dashboard:
+      rule: "Host(`traefik.hft-ninja.com`)"
+      service: "api@internal"
+      middlewares:
+        - "basic-auth"
+        - "admin-whitelist"
+        - "security-headers"
+      tls:
+        certResolver: "letsencrypt"
+    
+    # =======================================================================
+    # 🚫 Security: Block malicious paths
+    # =======================================================================
+    block-malicious:
+      rule: "PathPrefix(`/.env`) || PathPrefix(`/.git`) || PathPrefix(`/wp-admin`) || PathPrefix(`/admin`) || Path(`/robots.txt`)"
+      service: "noop@internal"
+      priority: 1000
+    
+    # =======================================================================
+    # 🔍 Robots.txt Router
+    # =======================================================================
+    robots:
+      rule: "Host(`hft-ninja.com`) && Path(`/robots.txt`)"
+      service: "noop@internal"
+      middlewares:
+        - "security-headers"
+      tls:
+        certResolver: "letsencrypt"
+
+# =========================================================================
+# 🔧 TCP Configuration (if needed for future services)
+# =========================================================================
+tcp:
+  routers:
+    # Example TCP router for database connections
+    # postgres:
+    #   rule: "HostSNI(`db.hft-ninja.com`)"
+    #   service: "postgres"
+    #   tls:
+    #     passthrough: true
+  
+  services:
+    # postgres:
+    #   loadBalancer:
+    #     servers:
+    #       - address: "postgres:5432"
+
+# =========================================================================
+# 🌐 UDP Configuration (if needed)
+# =========================================================================
+udp:
+  routers: {}
+  services: {}
+
+# =========================================================================
+# 🏷️ TLS Configuration
+# =========================================================================
+tls:
+  certificates:
+    # Manual certificates (if needed)
+    # - certFile: "/etc/ssl/certs/hft-ninja.com.crt"
+    #   keyFile: "/etc/ssl/private/hft-ninja.com.key"
+    #   stores:
+    #     - default
+  
+  stores:
+    default:
+      defaultCertificate:
+        certFile: "/etc/ssl/certs/default.crt"
+        keyFile: "/etc/ssl/private/default.key"
