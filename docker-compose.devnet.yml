@@ -1,0 +1,349 @@
+version: '3.8'
+
+# 🥷 Solana HFT Ninja 2025.07 - Devnet Trading Stack
+# Complete development environment with real Solana Devnet connection
+
+networks:
+  hft-devnet:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16
+
+volumes:
+  dragonfly-data:
+    driver: local
+  prometheus-data:
+    driver: local
+  grafana-data:
+    driver: local
+  solana-config:
+    driver: local
+
+services:
+  # =============================================================================
+  # 🐲 DragonflyDB - High-Performance Redis Alternative
+  # =============================================================================
+  dragonfly:
+    image: docker.dragonflydb.io/dragonflydb/dragonfly:v1.31.0
+    container_name: hft-dragonfly
+    restart: unless-stopped
+    
+    command: >
+      dragonfly
+      --logtostderr
+      --port=6379
+      --maxmemory=2gb
+      --cache_mode=true
+      --save_schedule="*/30 * * * *"
+      --snapshot_cron="0 */6 * * *"
+    
+    ports:
+      - "6379:6379"
+    
+    volumes:
+      - dragonfly-data:/data
+    
+    networks:
+      - hft-devnet
+    
+    healthcheck:
+      test: ["CMD", "redis-cli", "-p", "6379", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+    
+    environment:
+      - DRAGONFLY_PASSWORD=${DRAGONFLY_PASSWORD:-}
+    
+    labels:
+      - "traefik.enable=false"
+
+  # =============================================================================
+  # 🧮 DeepSeek-Math AI API - Quantized for Cost Efficiency
+  # =============================================================================
+  deepseek-math-devnet:
+    build:
+      context: ./cerebro/ai
+      dockerfile: Dockerfile.deepseek
+    container_name: hft-deepseek-devnet
+    restart: unless-stopped
+    
+    ports:
+      - "8003:8003"
+    
+    environment:
+      - MODEL_NAME=deepseek-ai/deepseek-math-7b-instruct
+      - USE_QUANTIZATION=true
+      - MAX_DAILY_COST=5.0
+      - PREFER_CACHE=true
+      - REDIS_URL=redis://dragonfly:6379
+      - LOG_LEVEL=INFO
+      - ENABLE_METRICS=true
+    
+    volumes:
+      - ./cerebro/ai:/app
+      - ./config:/config:ro
+    
+    networks:
+      - hft-devnet
+    
+    depends_on:
+      dragonfly:
+        condition: service_healthy
+    
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8003/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    
+    deploy:
+      resources:
+        limits:
+          memory: 8G
+          cpus: '4.0'
+        reservations:
+          memory: 4G
+          cpus: '2.0'
+
+  # =============================================================================
+  # 🌐 Cerebro BFF - Backend for Frontend with Devnet Integration
+  # =============================================================================
+  cerebro-bff-devnet:
+    build:
+      context: ./cerebro
+      dockerfile: Dockerfile.bff
+    container_name: hft-cerebro-bff-devnet
+    restart: unless-stopped
+    
+    ports:
+      - "8002:8002"
+    
+    environment:
+      - ENVIRONMENT=devnet
+      - DRAGONFLY_URL=redis://dragonfly:6379
+      - AI_API_URL=http://deepseek-math-devnet:8003
+      - SOLANA_RPC_URL=https://api.devnet.solana.com
+      - SOLANA_WS_URL=wss://api.devnet.solana.com
+      - WALLET_PATH=/config/wallet.json
+      - ENABLE_DEVNET_TRADING=true
+      - DRY_RUN=true
+      - LOG_LEVEL=INFO
+      - ENABLE_CORS=true
+    
+    volumes:
+      - ./cerebro:/app
+      - ./config:/config:ro
+      - solana-config:/solana-config
+    
+    networks:
+      - hft-devnet
+    
+    depends_on:
+      dragonfly:
+        condition: service_healthy
+      deepseek-math-devnet:
+        condition: service_healthy
+    
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8002/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+
+  # =============================================================================
+  # 🥷 HFT Ninja Engine - Rust Trading Engine with Devnet Connection
+  # =============================================================================
+  hft-ninja-devnet:
+    build:
+      context: .
+      dockerfile: Dockerfile.devnet
+    container_name: hft-ninja-engine-devnet
+    restart: unless-stopped
+    
+    ports:
+      - "8001:8001"  # Trading engine API
+      - "9090:9090"  # Prometheus metrics
+    
+    environment:
+      - RUST_LOG=info
+      - SOLANA_RPC_URL=https://api.devnet.solana.com
+      - SOLANA_WS_URL=wss://api.devnet.solana.com
+      - WALLET_PATH=/config/wallet.json
+      - CONFIG_PATH=/config/config.toml
+      - DRY_RUN=true
+      - ENABLE_METRICS=true
+      - METRICS_PORT=9090
+      - API_PORT=8001
+      - REDIS_URL=redis://dragonfly:6379
+    
+    volumes:
+      - ./config:/config:ro
+      - solana-config:/solana-config
+    
+    networks:
+      - hft-devnet
+    
+    depends_on:
+      dragonfly:
+        condition: service_healthy
+    
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8001/health"]
+      interval: 20s
+      timeout: 10s
+      retries: 3
+      start_period: 45s
+    
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+          cpus: '2.0'
+        reservations:
+          memory: 512M
+          cpus: '0.5'
+
+  # =============================================================================
+  # 📊 Prometheus - Metrics Collection
+  # =============================================================================
+  prometheus:
+    image: prom/prometheus:v2.47.0
+    container_name: hft-prometheus
+    restart: unless-stopped
+    
+    ports:
+      - "9091:9090"
+    
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--storage.tsdb.retention.time=30d'
+      - '--web.enable-lifecycle'
+      - '--web.enable-admin-api'
+    
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    
+    networks:
+      - hft-devnet
+    
+    depends_on:
+      - hft-ninja-devnet
+
+  # =============================================================================
+  # 📈 Grafana - Metrics Visualization
+  # =============================================================================
+  grafana:
+    image: grafana/grafana:10.1.0
+    container_name: hft-grafana
+    restart: unless-stopped
+    
+    ports:
+      - "3001:3000"
+    
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=hft-ninja-2025
+      - GF_USERS_ALLOW_SIGN_UP=false
+      - GF_INSTALL_PLUGINS=grafana-clock-panel,grafana-simple-json-datasource
+    
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./monitoring/grafana/dashboards:/etc/grafana/provisioning/dashboards:ro
+      - ./monitoring/grafana/datasources:/etc/grafana/provisioning/datasources:ro
+    
+    networks:
+      - hft-devnet
+    
+    depends_on:
+      - prometheus
+
+  # =============================================================================
+  # 🌐 Frontend - React Trading Dashboard
+  # =============================================================================
+  frontend-devnet:
+    build:
+      context: ./hft-ninja-frontend
+      dockerfile: Dockerfile
+    container_name: hft-frontend-devnet
+    restart: unless-stopped
+    
+    ports:
+      - "3000:3000"
+    
+    environment:
+      - REACT_APP_API_URL=http://localhost:8002
+      - REACT_APP_ENVIRONMENT=devnet
+      - REACT_APP_ENABLE_DEVNET_TRADING=true
+      - REACT_APP_WALLET_ADDRESS=DSJXCqXuRckDhSX34oiFgEQChuezxvVgkEAyaA2MML8X
+    
+    networks:
+      - hft-devnet
+    
+    depends_on:
+      - cerebro-bff-devnet
+    
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+  # =============================================================================
+  # 🔧 Solana CLI Tools Container (for wallet management)
+  # =============================================================================
+  solana-tools:
+    image: solanalabs/solana:v1.18.26
+    container_name: hft-solana-tools
+    restart: "no"
+    
+    volumes:
+      - ./config:/config
+      - solana-config:/root/.config/solana
+    
+    networks:
+      - hft-devnet
+    
+    command: >
+      sh -c "
+        solana config set --url devnet &&
+        solana config set --keypair /config/wallet.json &&
+        echo 'Solana CLI configured for devnet' &&
+        tail -f /dev/null
+      "
+
+# =============================================================================
+# 🏥 Health Check Service
+# =============================================================================
+  healthcheck:
+    image: alpine:3.18
+    container_name: hft-healthcheck
+    restart: unless-stopped
+    
+    command: >
+      sh -c "
+        apk add --no-cache curl &&
+        while true; do
+          echo '🏥 Health Check - $(date)' &&
+          curl -f http://cerebro-bff-devnet:8002/health || echo 'BFF unhealthy' &&
+          curl -f http://deepseek-math-devnet:8003/health || echo 'AI unhealthy' &&
+          curl -f http://hft-ninja-devnet:8001/health || echo 'Engine unhealthy' &&
+          sleep 60
+        done
+      "
+    
+    networks:
+      - hft-devnet
+    
+    depends_on:
+      - cerebro-bff-devnet
+      - deepseek-math-devnet
+      - hft-ninja-devnet

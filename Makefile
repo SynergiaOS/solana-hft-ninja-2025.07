@@ -85,11 +85,49 @@ prod:
 	@echo -e "  • API: http://localhost:8002"
 	@echo -e "  • Traefik Dashboard: http://localhost:8080"
 
+devnet:
+	@echo -e "$(GREEN)🌐 Starting HFT Ninja DEVNET environment...$(RESET)"
+	@echo -e "$(BLUE)Services: Real Solana Devnet, Trading Engine, AI, BFF, Frontend$(RESET)"
+	docker-compose -f docker-compose.devnet.yml up -d
+	@echo -e "$(GREEN)✅ Devnet stack started!$(RESET)"
+	@echo -e "$(YELLOW)🌐 Access points:$(RESET)"
+	@echo -e "  • Frontend: http://localhost:3000"
+	@echo -e "  • BFF API: http://localhost:8002"
+	@echo -e "  • Trading Engine: http://localhost:8001"
+	@echo -e "  • AI API: http://localhost:8003"
+	@echo -e "  • Grafana: http://localhost:3001"
+	@echo -e "  • Prometheus: http://localhost:9091"
+	@echo -e "$(YELLOW)💰 Wallet: DSJXCqXuRckDhSX34oiFgEQChuezxvVgkEAyaA2MML8X$(RESET)"
+
+devnet-logs:
+	@echo -e "$(GREEN)📜 Following Devnet logs... (Ctrl+C to exit)$(RESET)"
+	docker-compose -f docker-compose.devnet.yml logs -f
+
 down:
 	@echo -e "$(YELLOW)🛑 Stopping all HFT Ninja services...$(RESET)"
 	@docker-compose -f $(COMPOSE_FILE) down 2>/dev/null || true
+	@docker-compose -f docker-compose.devnet.yml down 2>/dev/null || true
 	@./scripts/stop-dev-stack.sh 2>/dev/null || true
 	@echo -e "$(GREEN)✅ All services stopped$(RESET)"
+
+devnet-down:
+	@echo -e "$(YELLOW)🛑 Stopping Devnet services...$(RESET)"
+	docker-compose -f docker-compose.devnet.yml down
+	@echo -e "$(GREEN)✅ Devnet services stopped$(RESET)"
+
+devnet-build:
+	@echo -e "$(GREEN)🔧 Building Devnet images...$(RESET)"
+	docker-compose -f docker-compose.devnet.yml build --parallel
+	@echo -e "$(GREEN)✅ Devnet images built$(RESET)"
+
+devnet-wallet:
+	@echo -e "$(GREEN)💰 Checking Devnet wallet...$(RESET)"
+	@echo -e "$(YELLOW)Address: DSJXCqXuRckDhSX34oiFgEQChuezxvVgkEAyaA2MML8X$(RESET)"
+	@solana balance DSJXCqXuRckDhSX34oiFgEQChuezxvVgkEAyaA2MML8X --url devnet || echo "Install Solana CLI to check balance"
+
+devnet-test:
+	@echo -e "$(GREEN)🧪 Testing Devnet endpoints...$(RESET)"
+	@./scripts/test-devnet.sh
 
 restart: down
 	@sleep 2
@@ -191,8 +229,20 @@ strategy-scale:
 # =============================================================================
 
 security-scan:
-	@echo -e "$(GREEN)🛡️ Running security vulnerability scan...$(RESET)"
+	@echo -e "$(GREEN)🛡️ Running Chainguard security vulnerability scan...$(RESET)"
 	@./scripts/security-scan.sh
+
+security-verify:
+	@echo -e "$(GREEN)🔐 Verifying Chainguard image signatures...$(RESET)"
+	@./scripts/verify-chainguard-signatures.sh
+
+security-sbom:
+	@echo -e "$(GREEN)📋 Generating SBOMs for all images...$(RESET)"
+	@./scripts/generate-sboms.sh
+
+security-compliance:
+	@echo -e "$(GREEN)📊 Running compliance checks (PCI DSS, CMMC, FedRAMP)...$(RESET)"
+	@./scripts/compliance-check.sh
 
 backup:
 	@echo -e "$(GREEN)💾 Creating backup...$(RESET)"

@@ -2,6 +2,10 @@
 global:
   scrape_interval: 15s
   evaluation_interval: 15s
+  external_labels:
+    cluster: 'hft-ninja-devnet'
+    environment: 'devnet'
+    security_provider: 'chainguard'
 
 rule_files:
   - "alert_rules.yml"

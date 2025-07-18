@@ -1,0 +1,40 @@
+# 🧮 DeepSeek-Math AI API - Quantized for Cost Efficiency
+# 🛡️ CHAINGUARD SECURITY: Ultra-secure AI service with zero CVEs
+# Lightweight AI service with 4-bit quantization
+
+FROM cgr.dev/chainguard/python:latest
+
+# 🛡️ CHAINGUARD: Secure by design - no unnecessary packages
+
+# Set working directory
+WORKDIR /app
+
+# Copy requirements
+COPY requirements.txt .
+
+# Install Python dependencies
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Copy application code
+COPY . .
+
+# 🛡️ CHAINGUARD: Non-root by default - enhanced security posture
+
+# Expose port
+EXPOSE 8003
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+    CMD curl -f http://localhost:8003/health || exit 1
+
+# Environment variables
+ENV PYTHONPATH=/app
+ENV PYTHONUNBUFFERED=1
+ENV MODEL_NAME=deepseek-ai/deepseek-math-7b-instruct
+ENV USE_QUANTIZATION=true
+ENV MAX_DAILY_COST=5.0
+ENV PREFER_CACHE=true
+ENV LOG_LEVEL=INFO
+
+# Start command
+CMD ["python", "deepseek_api_mock.py"]
