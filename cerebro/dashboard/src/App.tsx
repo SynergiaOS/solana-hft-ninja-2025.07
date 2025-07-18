@@ -17,6 +17,7 @@ import StrategiesPage from '@/pages/StrategiesPage';
 import AnalyticsPage from '@/pages/AnalyticsPage';
 import SystemPage from '@/pages/SystemPage';
 import SettingsPage from '@/pages/SettingsPage';
+import EnhancedAnalysisPage from '@/pages/EnhancedAnalysisPage';
 
 // Hooks
 import { useBackendSync } from '@/hooks/useBackendSync';
@@ -62,6 +63,7 @@ function App() {
                 <Route path="fingpt" element={<FinGPTPage />} />
                 <Route path="strategies" element={<StrategiesPage />} />
                 <Route path="analytics" element={<AnalyticsPage />} />
+                <Route path="enhanced" element={<EnhancedAnalysisPage />} />
                 <Route path="system" element={<SystemPage />} />
                 <Route path="settings" element={<SettingsPage />} />
               </Route>

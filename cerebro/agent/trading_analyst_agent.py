@@ -23,6 +23,25 @@ from .tools.fingpt_tool import (
     FinGPTAnalysisTool,
     FinGPTMarketInsightTool
 )
+from .human_in_the_loop import (
+    HumanInTheLoopManager,
+    TradingDecision,
+    RiskLevel,
+    ApprovalStatus,
+    assess_trading_risk,
+    calculate_confidence_score
+)
+from .notification_system import (
+    NotificationManager,
+    DiscordNotificationChannel,
+    TelegramNotificationChannel,
+    WebSocketNotificationChannel
+)
+from .multi_agent_system import (
+    MultiAgentCoordinator,
+    AgentRole,
+    AgentAnalysis
+)
 from ..memory.memory_manager import MemoryManager
 from ..core.config import CerebroConfig
 
@@ -49,17 +68,25 @@ class TradingAnalystAgent:
         self.langgraph_flow = None
         self.session_id = None
         self.conversation_history = []
-        
+
+        # TensorZero-inspired enhancements
+        self.human_loop_manager = None
+        self.notification_manager = None
+        self.multi_agent_coordinator = None
+
         # Performance metrics
         self.metrics = {
             "total_queries": 0,
             "successful_responses": 0,
             "average_response_time": 0.0,
             "total_actions_executed": 0,
-            "memory_entries_created": 0
+            "memory_entries_created": 0,
+            "human_approvals_requested": 0,
+            "auto_approvals": 0,
+            "multi_agent_analyses": 0
         }
-        
-        logger.info("TradingAnalystAgent initialized")
+
+        logger.info("TradingAnalystAgent initialized with TensorZero enhancements")
     
     async def initialize(self):
         """Initialize all components"""
@@ -78,7 +105,10 @@ class TradingAnalystAgent:
 
             # Initialize tools
             self.tools = await self._initialize_tools()
-            
+
+            # Initialize TensorZero-inspired enhancements
+            await self._initialize_tensorZero_enhancements()
+
             # Initialize LangGraph flow
             primary_llm = await self.llm_router.get_primary_llm()
             self.langgraph_flow = CerebroLangGraphFlow(
@@ -92,10 +122,73 @@ class TradingAnalystAgent:
             self.session_id = f"session_{int(time.time())}"
             
             logger.info("✅ TradingAnalystAgent fully initialized")
-            
+
         except Exception as e:
             logger.error(f"Failed to initialize TradingAnalystAgent: {e}")
             raise
+
+    async def _initialize_tensorZero_enhancements(self):
+        """Initialize TensorZero-inspired enhancements"""
+        try:
+            logger.info("Initializing TensorZero-inspired enhancements...")
+
+            # Initialize Human-in-the-Loop Manager
+            hitl_config = {
+                "auto_approval_thresholds": {
+                    "low": 0.85,
+                    "medium": 0.95,
+                    "high": 1.0,
+                    "critical": 1.0
+                },
+                "approval_timeouts": {
+                    "low": 300,      # 5 minutes
+                    "medium": 600,   # 10 minutes
+                    "high": 1800,    # 30 minutes
+                    "critical": 3600 # 1 hour
+                }
+            }
+            self.human_loop_manager = HumanInTheLoopManager(hitl_config)
+
+            # Initialize Notification Manager
+            self.notification_manager = NotificationManager()
+
+            # Add notification channels if configured
+            if hasattr(self.config, 'discord_webhook_url') and self.config.discord_webhook_url:
+                discord_channel = DiscordNotificationChannel(self.config.discord_webhook_url)
+                self.notification_manager.add_channel(discord_channel)
+
+            if hasattr(self.config, 'telegram_bot_token') and self.config.telegram_bot_token:
+                telegram_channel = TelegramNotificationChannel(
+                    self.config.telegram_bot_token,
+                    self.config.telegram_chat_id
+                )
+                self.notification_manager.add_channel(telegram_channel)
+
+            # Register notification callback with human loop manager
+            self.human_loop_manager.add_notification_callback(
+                self.notification_manager.send_approval_request
+            )
+
+            # Initialize Multi-Agent Coordinator
+            multi_agent_config = {
+                "sentiment_analysis": True,
+                "technical_analysis": True,
+                "risk_assessment": True,
+                "collaboration_timeout": 30
+            }
+            self.multi_agent_coordinator = MultiAgentCoordinator(multi_agent_config)
+
+            # Start multi-agent system
+            await self.multi_agent_coordinator.start_all_agents()
+
+            logger.info("TensorZero enhancements initialized successfully")
+
+        except Exception as e:
+            logger.error(f"Failed to initialize TensorZero enhancements: {e}")
+            # Continue without enhancements rather than failing completely
+            self.human_loop_manager = None
+            self.notification_manager = None
+            self.multi_agent_coordinator = None
     
     async def _initialize_tools(self) -> List[BaseTool]:
         """Initialize all agent tools including FinGPT tools"""
@@ -235,6 +328,117 @@ class TradingAnalystAgent:
         
         # General inquiry
         return "general"
+
+    async def enhanced_trading_analysis(self, query: str, context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+        """
+        Enhanced trading analysis using TensorZero-inspired features:
+        - Multi-agent collaboration
+        - Human-in-the-loop approval
+        - Advanced confidence scoring
+        """
+        start_time = time.time()
+        self.metrics["total_queries"] += 1
+
+        try:
+            logger.info(f"Starting enhanced analysis for: {query[:100]}...")
+
+            # Step 1: Multi-Agent Collaborative Analysis
+            collaborative_result = None
+            if self.multi_agent_coordinator:
+                logger.info("Requesting multi-agent collaborative analysis...")
+
+                analysis_data = {
+                    "query": query,
+                    "context": context or {},
+                    "market_data": await self._get_current_market_data(),
+                    "portfolio_data": await self._get_portfolio_data(),
+                    "historical_data": await self._get_historical_data()
+                }
+
+                collaborative_result = await self.multi_agent_coordinator.collaborative_analysis(analysis_data)
+                self.metrics["multi_agent_analyses"] += 1
+
+            # Step 2: Generate Trading Decision
+            trading_decision = await self._generate_trading_decision(query, context, collaborative_result)
+
+            # Step 3: Human-in-the-Loop Approval (if needed)
+            approval_result = None
+            if self.human_loop_manager and trading_decision:
+                logger.info("Checking if human approval is needed...")
+
+                approval_request = await self.human_loop_manager.request_approval(trading_decision)
+
+                if approval_request.approval_status == ApprovalStatus.PENDING:
+                    self.metrics["human_approvals_requested"] += 1
+                    logger.info(f"Human approval requested: {approval_request.request_id}")
+
+                    # Wait for approval (non-blocking for analysis, but log the request)
+                    approval_result = {
+                        "status": "pending",
+                        "request_id": approval_request.request_id,
+                        "expires_at": approval_request.expires_at
+                    }
+                elif approval_request.approval_status == ApprovalStatus.AUTO_APPROVED:
+                    self.metrics["auto_approvals"] += 1
+                    approval_result = {
+                        "status": "auto_approved",
+                        "confidence": trading_decision.confidence_score
+                    }
+
+            # Step 4: Generate Comprehensive Response
+            response = await self._generate_enhanced_response(
+                query,
+                collaborative_result,
+                trading_decision,
+                approval_result
+            )
+
+            # Step 5: Store in Memory
+            if self.memory_manager:
+                await self.memory_manager.store_interaction(
+                    query=query,
+                    response=response["response"],
+                    context={
+                        "collaborative_analysis": collaborative_result,
+                        "trading_decision": trading_decision.__dict__ if trading_decision else None,
+                        "approval_result": approval_result,
+                        "execution_time": time.time() - start_time
+                    }
+                )
+                self.metrics["memory_entries_created"] += 1
+
+            # Update metrics
+            self.metrics["successful_responses"] += 1
+            execution_time = time.time() - start_time
+            self.metrics["average_response_time"] = (
+                (self.metrics["average_response_time"] * (self.metrics["successful_responses"] - 1) + execution_time)
+                / self.metrics["successful_responses"]
+            )
+
+            logger.info(f"Enhanced analysis completed in {execution_time:.2f}s")
+
+            return {
+                **response,
+                "execution_time": execution_time,
+                "enhancements_used": {
+                    "multi_agent": collaborative_result is not None,
+                    "human_loop": approval_result is not None,
+                    "advanced_confidence": trading_decision is not None
+                }
+            }
+
+        except Exception as e:
+            logger.error(f"Enhanced analysis failed: {e}")
+            return {
+                "response": f"Analysis failed: {e}",
+                "error": str(e),
+                "execution_time": time.time() - start_time,
+                "enhancements_used": {
+                    "multi_agent": False,
+                    "human_loop": False,
+                    "advanced_confidence": False
+                }
+            }
     
     async def _store_interaction_memory(self, query: str, result: Dict[str, Any], 
                                       intent: str, execution_time: float):
@@ -337,11 +541,168 @@ class TradingAnalystAgent:
             
             if self.llm_router:
                 await self.llm_router.close()
-            
+
+            # Shutdown TensorZero enhancements
+            if self.multi_agent_coordinator:
+                await self.multi_agent_coordinator.stop_all_agents()
+
+            if self.notification_manager:
+                await self.notification_manager.close_all()
+
             logger.info("✅ TradingAnalystAgent shutdown complete")
-            
+
         except Exception as e:
             logger.error(f"Error during shutdown: {e}")
+
+    async def _generate_trading_decision(self, query: str, context: Optional[Dict], collaborative_result: Optional[Dict]) -> Optional[TradingDecision]:
+        """Generate a trading decision from analysis"""
+        try:
+            # Extract trading intent from query
+            if not any(word in query.lower() for word in ["buy", "sell", "trade", "position", "strategy"]):
+                return None  # Not a trading query
+
+            # Determine action and token
+            action = "hold"
+            token_symbol = "SOL"
+            amount_sol = 0.1  # Default small amount
+
+            if "buy" in query.lower():
+                action = "buy"
+            elif "sell" in query.lower():
+                action = "sell"
+
+            # Extract token symbol if mentioned
+            tokens = ["SOL", "USDC", "RAY", "ORCA", "JUP"]
+            for token in tokens:
+                if token.lower() in query.lower():
+                    token_symbol = token
+                    break
+
+            # Calculate confidence from collaborative analysis
+            base_confidence = 0.6  # Default
+            if collaborative_result and "synthesis" in collaborative_result:
+                synthesis = collaborative_result["synthesis"]
+                base_confidence = synthesis.get("confidence", 0.6)
+
+            # Get market conditions
+            market_conditions = await self._get_current_market_data()
+
+            # Calculate final confidence
+            confidence_score = calculate_confidence_score(
+                base_confidence,
+                market_conditions,
+                {"success_rate": 0.75}  # Historical performance placeholder
+            )
+
+            # Create trading decision
+            decision = TradingDecision(
+                decision_id=f"decision_{int(time.time() * 1000)}",
+                strategy_type="manual_analysis",
+                action=action,
+                token_symbol=token_symbol,
+                amount_sol=amount_sol,
+                confidence_score=confidence_score,
+                risk_level=RiskLevel.LOW,  # Will be updated below
+                reasoning=f"Analysis based on query: {query}",
+                market_conditions=market_conditions,
+                timestamp=datetime.now().isoformat(),
+                estimated_profit=amount_sol * 0.05,  # 5% estimated profit
+                max_loss=amount_sol * 0.1  # 10% max loss
+            )
+
+            # Assess risk level
+            decision.risk_level = assess_trading_risk(decision)
+
+            return decision
+
+        except Exception as e:
+            logger.error(f"Failed to generate trading decision: {e}")
+            return None
+
+    async def _get_current_market_data(self) -> Dict[str, Any]:
+        """Get current market data"""
+        # Placeholder - would integrate with real market data
+        return {
+            "volatility": 0.3,
+            "liquidity_score": 0.7,
+            "trend_strength": 0.6,
+            "price_change_24h": 0.02,
+            "volume_change_24h": 0.15
+        }
+
+    async def _get_portfolio_data(self) -> Dict[str, Any]:
+        """Get current portfolio data"""
+        # Placeholder - would integrate with real portfolio data
+        return {
+            "total_sol": 8.0,
+            "available_sol": 6.5,
+            "token_concentration": {"SOL": 0.8, "USDC": 0.2}
+        }
+
+    async def _get_historical_data(self) -> Dict[str, Any]:
+        """Get historical performance data"""
+        # Placeholder - would integrate with real historical data
+        return {
+            "success_rate": 0.75,
+            "average_profit": 0.03,
+            "max_drawdown": 0.15,
+            "total_trades": 150
+        }
+
+    async def _generate_enhanced_response(self, query: str, collaborative_result: Optional[Dict],
+                                        trading_decision: Optional[TradingDecision],
+                                        approval_result: Optional[Dict]) -> Dict[str, Any]:
+        """Generate enhanced response with all analysis components"""
+
+        response_parts = []
+
+        # Add collaborative analysis summary
+        if collaborative_result:
+            synthesis = collaborative_result.get("synthesis", {})
+            response_parts.append(f"🤖 **Multi-Agent Analysis**: {synthesis.get('recommendation', 'HOLD')} "
+                                f"(confidence: {synthesis.get('confidence', 0):.1%})")
+
+            # Add individual agent insights
+            individual_analyses = collaborative_result.get("individual_analyses", [])
+            for analysis in individual_analyses:
+                agent_role = analysis.get("agent_role", "unknown")
+                recommendation = analysis.get("recommendation", "HOLD")
+                confidence = analysis.get("confidence", 0)
+                response_parts.append(f"  • {agent_role}: {recommendation} ({confidence:.1%})")
+
+        # Add trading decision info
+        if trading_decision:
+            response_parts.append(f"\n💡 **Trading Decision**: {trading_decision.action.upper()} "
+                                f"{trading_decision.amount_sol:.3f} {trading_decision.token_symbol}")
+            response_parts.append(f"  • Confidence: {trading_decision.confidence_score:.1%}")
+            response_parts.append(f"  • Risk Level: {trading_decision.risk_level.value.upper()}")
+            response_parts.append(f"  • Est. Profit: {trading_decision.estimated_profit:.3f} SOL")
+
+        # Add approval status
+        if approval_result:
+            if approval_result["status"] == "pending":
+                response_parts.append(f"\n⏳ **Human Approval Required**: Request {approval_result['request_id']}")
+                response_parts.append(f"  • Expires: {approval_result['expires_at']}")
+            elif approval_result["status"] == "auto_approved":
+                response_parts.append(f"\n✅ **Auto-Approved**: High confidence ({approval_result['confidence']:.1%})")
+
+        # Add reasoning
+        response_parts.append(f"\n📊 **Analysis**: {query}")
+
+        if collaborative_result and "synthesis" in collaborative_result:
+            reasoning = collaborative_result["synthesis"].get("reasoning", "")
+            if reasoning:
+                response_parts.append(f"  • {reasoning}")
+
+        return {
+            "response": "\n".join(response_parts),
+            "metadata": {
+                "collaborative_analysis": collaborative_result,
+                "trading_decision": trading_decision.__dict__ if trading_decision else None,
+                "approval_result": approval_result,
+                "timestamp": datetime.now().isoformat()
+            }
+        }
 
 # Factory function for easy instantiation
 async def create_trading_analyst_agent(config: CerebroConfig) -> TradingAnalystAgent:

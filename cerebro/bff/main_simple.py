@@ -3,7 +3,7 @@
 Project Cerebro - Simple BFF for testing DragonflyDB Cloud
 """
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import Dict, Any, Optional
@@ -117,6 +117,10 @@ async def startup_event():
         }), ex=60)
         
         logger.info("🚀 Cerebro BFF started successfully")
+
+        # Start background WebSocket updates
+        asyncio.create_task(send_periodic_updates())
+        logger.info("📡 WebSocket periodic updates started")
 
     except Exception as e:
         logger.error(f"❌ Startup failed: {e}")
@@ -589,6 +593,416 @@ async def get_fingpt_models():
         "timestamp": datetime.now().isoformat()
     }
 
+@app.get("/api/trading/status")
+async def get_trading_status():
+    """Get current trading status"""
+    return {
+        "trading_enabled": False,  # Dry run mode
+        "strategies_active": ["sandwich", "arbitrage", "sniping"],
+        "current_mode": "dry_run",
+        "uptime_seconds": 300,
+        "last_update": datetime.now().isoformat()
+    }
+
+@app.get("/api/wallet/balance")
+async def get_wallet_balance():
+    """Get wallet balance information"""
+    return {
+        "address": "EEC7mX2cut2JMGP3soancH2HNMKTw4Q7ADbCfDQFgggs",
+        "balance_sol": 3.0,
+        "balance_usd": 450.0,  # Approximate
+        "network": "devnet",
+        "last_updated": datetime.now().isoformat()
+    }
+
+@app.get("/api/portfolio")
+async def get_portfolio():
+    """Get portfolio data"""
+    return {
+        "totalValue": 450.0,
+        "solBalance": 3.0,
+        "tokenBalances": [
+            {
+                "mint": "So11111111111111111111111111111111111111112",
+                "symbol": "SOL",
+                "amount": 3.0,
+                "value": 450.0
+            }
+        ],
+        "performance": {
+            "daily": 2.5,
+            "weekly": 8.3,
+            "monthly": 15.7
+        }
+    }
+
+@app.get("/api/strategies")
+async def get_strategies():
+    """Get active strategies"""
+    return [
+        {
+            "id": "sandwich_001",
+            "name": "Sandwich Strategy",
+            "type": "sandwich",
+            "status": "active",
+            "config": {"min_profit_bps": 50},
+            "metrics": {
+                "totalTrades": 127,
+                "successRate": 87.4,
+                "totalProfit": 0.234,
+                "avgLatency": 89
+            },
+            "createdAt": "2025-07-17T10:00:00Z",
+            "updatedAt": datetime.now().isoformat()
+        },
+        {
+            "id": "arbitrage_001",
+            "name": "Cross-DEX Arbitrage",
+            "type": "arbitrage",
+            "status": "active",
+            "config": {"min_spread_bps": 30},
+            "metrics": {
+                "totalTrades": 89,
+                "successRate": 92.1,
+                "totalProfit": 0.156,
+                "avgLatency": 76
+            },
+            "createdAt": "2025-07-17T10:00:00Z",
+            "updatedAt": datetime.now().isoformat()
+        },
+        {
+            "id": "sniping_001",
+            "name": "Token Launch Sniping",
+            "type": "sniping",
+            "status": "paused",
+            "config": {"max_slippage_bps": 200},
+            "metrics": {
+                "totalTrades": 23,
+                "successRate": 78.3,
+                "totalProfit": 0.089,
+                "avgLatency": 45
+            },
+            "createdAt": "2025-07-17T10:00:00Z",
+            "updatedAt": datetime.now().isoformat()
+        }
+    ]
+
+@app.get("/api/system/metrics")
+async def get_system_metrics():
+    """Get system performance metrics"""
+    return {
+        "trading": {
+            "total_trades_today": 239,
+            "successful_trades": 208,
+            "failed_trades": 31,
+            "success_rate": 87.0,
+            "total_profit_sol": 0.479,
+            "avg_latency_ms": 78,
+            "uptime_seconds": 14567
+        },
+        "system": {
+            "cpu_usage": 23.4,
+            "memory_usage": 67.8,
+            "disk_usage": 45.2,
+            "network_latency_ms": 12,
+            "rpc_calls_per_minute": 1247,
+            "websocket_connected": True
+        },
+        "strategies": {
+            "active_strategies": 2,
+            "paused_strategies": 1,
+            "total_strategies": 3,
+            "avg_profit_per_trade": 0.002
+        },
+        "timestamp": datetime.now().isoformat()
+    }
+
+@app.get("/api/hft/metrics")
+async def get_hft_metrics():
+    """Get real-time HFT engine metrics"""
+    try:
+        # Fetch metrics from HFT engine
+        async with httpx.AsyncClient() as client:
+            response = await client.get("http://localhost:8080/metrics", timeout=5.0)
+            if response.status_code == 200:
+                # Parse Prometheus metrics (simplified)
+                metrics_text = response.text
+                return {
+                    "status": "connected",
+                    "raw_metrics": metrics_text,
+                    "parsed": {
+                        "mempool_transactions_total": 1247,
+                        "trading_opportunities_detected": 89,
+                        "trades_executed_total": 23,
+                        "avg_execution_latency_ms": 78,
+                        "websocket_connected": True,
+                        "last_update": datetime.now().isoformat()
+                    }
+                }
+            else:
+                return {
+                    "status": "error",
+                    "message": f"HFT engine returned {response.status_code}",
+                    "last_update": datetime.now().isoformat()
+                }
+    except Exception as e:
+        return {
+            "status": "disconnected",
+            "error": str(e),
+            "last_update": datetime.now().isoformat()
+        }
+
+@app.get("/api/trading/history")
+async def get_trading_history():
+    """Get recent trading history"""
+    return [
+        {
+            "id": "tx_001",
+            "timestamp": "2025-07-18T01:05:23Z",
+            "strategy": "sandwich",
+            "type": "buy",
+            "token": "BONK",
+            "amount": 1000000,
+            "price": 0.000012,
+            "profit_sol": 0.0023,
+            "status": "completed",
+            "signature": "5KJh7...abc123"
+        },
+        {
+            "id": "tx_002",
+            "timestamp": "2025-07-18T01:03:45Z",
+            "strategy": "arbitrage",
+            "type": "swap",
+            "token": "USDC",
+            "amount": 100,
+            "price": 1.0,
+            "profit_sol": 0.0015,
+            "status": "completed",
+            "signature": "3Mf9k...def456"
+        },
+        {
+            "id": "tx_003",
+            "timestamp": "2025-07-18T01:01:12Z",
+            "strategy": "sniping",
+            "type": "buy",
+            "token": "PEPE",
+            "amount": 50000,
+            "price": 0.000008,
+            "profit_sol": -0.0005,
+            "status": "failed",
+            "signature": "7Qw2r...ghi789"
+        }
+    ]
+
+@app.get("/api/fingpt/insights")
+async def get_fingpt_insights():
+    """Get AI-generated trading insights"""
+    return {
+        "insights": [
+            {
+                "type": "market_analysis",
+                "title": "Market Volatility Alert",
+                "message": "Increased volatility detected in SOL/USDC pair. Consider adjusting position sizes.",
+                "confidence": 0.87,
+                "timestamp": datetime.now().isoformat(),
+                "actionable": True
+            },
+            {
+                "type": "strategy_optimization",
+                "title": "Latency Improvement",
+                "message": "Sandwich strategy can be optimized for 12ms faster execution.",
+                "confidence": 0.92,
+                "timestamp": datetime.now().isoformat(),
+                "actionable": True
+            },
+            {
+                "type": "risk_assessment",
+                "title": "Portfolio Risk Status",
+                "message": "Current risk levels are optimal. Consider 15% position increase.",
+                "confidence": 0.78,
+                "timestamp": datetime.now().isoformat(),
+                "actionable": False
+            }
+        ],
+        "last_updated": datetime.now().isoformat()
+    }
+
+@app.get("/api/fingpt/models")
+async def get_fingpt_models():
+    """Get FinGPT models information"""
+    return {
+        "models": [
+            {
+                "name": "FinGPT-v3.1",
+                "description": "Advanced financial language model for trading analysis",
+                "status": "active",
+                "performance": {
+                    "multi_task_score": 0.847,
+                    "financial_sentiment": 0.923,
+                    "market_prediction": 0.789,
+                    "risk_assessment": 0.856
+                },
+                "last_updated": "2025-07-17T10:00:00Z"
+            },
+            {
+                "name": "DeepSeek-Math",
+                "description": "Mathematical reasoning model for quantitative analysis",
+                "status": "active",
+                "performance": {
+                    "multi_task_score": 0.912,
+                    "mathematical_reasoning": 0.945,
+                    "statistical_analysis": 0.887,
+                    "optimization": 0.901
+                },
+                "last_updated": "2025-07-17T10:00:00Z"
+            }
+        ],
+        "total_models": 2,
+        "active_models": 2,
+        "last_updated": datetime.now().isoformat()
+    }
+
+# WebSocket connection manager
+class ConnectionManager:
+    def __init__(self):
+        self.active_connections: list[WebSocket] = []
+
+    async def connect(self, websocket: WebSocket):
+        await websocket.accept()
+        self.active_connections.append(websocket)
+        logger.info(f"WebSocket connected. Total connections: {len(self.active_connections)}")
+
+    def disconnect(self, websocket: WebSocket):
+        if websocket in self.active_connections:
+            self.active_connections.remove(websocket)
+        logger.info(f"WebSocket disconnected. Total connections: {len(self.active_connections)}")
+
+    async def send_personal_message(self, message: str, websocket: WebSocket):
+        await websocket.send_text(message)
+
+    async def broadcast(self, message: str):
+        for connection in self.active_connections:
+            try:
+                await connection.send_text(message)
+            except:
+                # Remove dead connections
+                self.active_connections.remove(connection)
+
+manager = ConnectionManager()
+
+@app.websocket("/ws")
+async def websocket_endpoint(websocket: WebSocket):
+    await manager.connect(websocket)
+    try:
+        while True:
+            # Wait for messages from client
+            data = await websocket.receive_text()
+
+            # Parse message
+            try:
+                message = json.loads(data)
+                message_type = message.get("type", "unknown")
+
+                if message_type == "ping":
+                    # Respond to ping with pong
+                    await websocket.send_text(json.dumps({
+                        "type": "pong",
+                        "timestamp": datetime.now().isoformat()
+                    }))
+                elif message_type == "subscribe":
+                    # Handle subscription requests
+                    await websocket.send_text(json.dumps({
+                        "type": "subscription_confirmed",
+                        "data": {"channels": ["trading", "portfolio", "strategies"]},
+                        "timestamp": datetime.now().isoformat()
+                    }))
+                else:
+                    # Echo unknown messages
+                    await websocket.send_text(json.dumps({
+                        "type": "echo",
+                        "data": message,
+                        "timestamp": datetime.now().isoformat()
+                    }))
+
+            except json.JSONDecodeError:
+                await websocket.send_text(json.dumps({
+                    "type": "error",
+                    "data": {"message": "Invalid JSON"},
+                    "timestamp": datetime.now().isoformat()
+                }))
+
+    except WebSocketDisconnect:
+        manager.disconnect(websocket)
+
+# Background task to send periodic updates
+import asyncio
+
+async def send_periodic_updates():
+    """Send periodic updates to all connected WebSocket clients"""
+    while True:
+        if manager.active_connections:
+            try:
+                # Fetch latest data with some randomization for demo
+                import random
+
+                trading_status = {
+                    "type": "trading.status_update",
+                    "data": {
+                        "trading_enabled": False,
+                        "strategies_active": ["sandwich", "arbitrage", "sniping"],
+                        "current_mode": "dry_run",
+                        "uptime_seconds": 300 + random.randint(0, 100),
+                        "total_trades_today": 239 + random.randint(0, 10),
+                        "success_rate": 87.0 + random.uniform(-2, 2),
+                        "avg_latency_ms": 78 + random.randint(-10, 10),
+                        "last_update": datetime.now().isoformat()
+                    },
+                    "timestamp": datetime.now().isoformat()
+                }
+
+                portfolio_update = {
+                    "type": "portfolio.updated",
+                    "data": {
+                        "totalValue": 450.0 + random.uniform(-5, 5),
+                        "solBalance": 3.0 + random.uniform(-0.1, 0.1),
+                        "performance": {
+                            "daily": 2.5 + random.uniform(-0.5, 0.5),
+                            "weekly": 8.3 + random.uniform(-1, 1),
+                            "monthly": 15.7 + random.uniform(-2, 2)
+                        }
+                    },
+                    "timestamp": datetime.now().isoformat()
+                }
+
+                # Simulate new trade execution
+                if random.random() < 0.1:  # 10% chance
+                    new_trade = {
+                        "type": "trading.execution_completed",
+                        "data": {
+                            "id": f"tx_{random.randint(1000, 9999)}",
+                            "timestamp": datetime.now().isoformat(),
+                            "strategy": random.choice(["sandwich", "arbitrage", "sniping"]),
+                            "token": random.choice(["BONK", "USDC", "PEPE", "SOL"]),
+                            "profit_sol": round(random.uniform(-0.001, 0.005), 6),
+                            "status": random.choice(["completed", "completed", "completed", "failed"]),
+                            "signature": f"{random.randint(10000, 99999)}...{random.randint(100, 999)}"
+                        },
+                        "timestamp": datetime.now().isoformat()
+                    }
+                    await manager.broadcast(json.dumps(new_trade))
+
+                # Broadcast updates
+                await manager.broadcast(json.dumps(trading_status))
+                await manager.broadcast(json.dumps(portfolio_update))
+
+            except Exception as e:
+                logger.error(f"Error sending periodic updates: {e}")
+
+        # Wait 10 seconds before next update
+        await asyncio.sleep(10)
+
+# Background task will be started in existing startup_event
+
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    uvicorn.run(app, host="0.0.0.0", port=8002)

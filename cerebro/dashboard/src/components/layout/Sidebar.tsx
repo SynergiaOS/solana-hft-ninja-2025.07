@@ -12,6 +12,7 @@ import {
   BeakerIcon,
   XMarkIcon,
 } from '@heroicons/react/24/outline';
+import { Brain } from 'lucide-react';
 import ConnectionStatus from '@/components/ui/ConnectionStatus';
 
 interface SidebarProps {
@@ -22,6 +23,7 @@ const navigation = [
   { name: 'Dashboard', href: '/overview', icon: HomeIcon },
   { name: 'Trading', href: '/trading', icon: ChartBarIcon },
   { name: 'FinGPT AI', href: '/fingpt', icon: CpuChipIcon, badge: 'AI' },
+  { name: 'Enhanced AI', href: '/enhanced', icon: Brain, badge: 'NEW' },
   { name: 'Strategies', href: '/strategies', icon: BoltIcon },
   { name: 'Analytics', href: '/analytics', icon: ChartPieIcon },
   { name: 'System', href: '/system', icon: ServerStackIcon },

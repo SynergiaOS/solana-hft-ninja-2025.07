@@ -5,7 +5,7 @@ Retrieval-Augmented Generation with semantic search in DragonflyDB
 """
 
 import asyncio
-import aioredis
+import redis.asyncio as aioredis
 import numpy as np
 import json
 import logging
