@@ -3,7 +3,7 @@
 Project Cerebro - Simple BFF for testing DragonflyDB Cloud
 """
 
-from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect, Request
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import Dict, Any, Optional
@@ -14,6 +14,7 @@ import time
 import logging
 import os
 import urllib.parse
+import random
 from datetime import datetime
 from dotenv import load_dotenv
 
@@ -1060,6 +1061,126 @@ async def proxy_ai_health():
     except Exception as e:
         logger.error(f"AI API error: {e}")
         raise HTTPException(status_code=500, detail=f"AI API error: {str(e)}")
+
+# =============================================================================
+# 💰 TRADING ENDPOINTS
+# =============================================================================
+
+@app.post("/api/trading/execute")
+async def execute_trade(request: Request):
+    """Execute a trade order"""
+    try:
+        data = await request.json()
+        action = data.get("action", "buy")
+        token = data.get("token", "SOL")
+        amount = data.get("amount", 1.0)
+        strategy = data.get("strategy", "manual")
+
+        # Simulate trade execution with realistic data
+        base_price = 23.45
+        if token == "USDC":
+            base_price = 1.0
+        elif token == "USDT":
+            base_price = 0.999
+
+        execution_price = base_price + random.uniform(-0.02, 0.02)
+
+        trade_result = {
+            "trade_id": f"trade_{int(time.time())}_{random.randint(1000, 9999)}",
+            "status": "executed" if random.random() > 0.05 else "failed",
+            "action": action,
+            "token": token,
+            "amount": amount,
+            "price": round(execution_price, 4),
+            "timestamp": datetime.now().isoformat(),
+            "fees": round(amount * 0.0025, 6),  # 0.25% fee
+            "slippage": round(random.uniform(0.001, 0.01), 4),
+            "strategy": strategy,
+            "gas_cost": round(random.uniform(0.0001, 0.0005), 6),
+            "execution_time_ms": random.randint(50, 200)
+        }
+
+        # Add some failure simulation
+        if trade_result["status"] == "failed":
+            trade_result["error"] = random.choice([
+                "Insufficient liquidity",
+                "Slippage too high",
+                "Network congestion",
+                "Price impact too large"
+            ])
+
+        # Store trade in memory for history
+        trade_key = f"cerebro:trade:{trade_result['trade_id']}"
+        redis_client.set(trade_key, json.dumps(trade_result), ex=86400)  # 24h TTL
+
+        return trade_result
+
+    except Exception as e:
+        logger.error(f"Trade execution error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/trading/history")
+async def get_trading_history(limit: int = 50):
+    """Get recent trading history"""
+    try:
+        trade_keys = redis_client.keys("cerebro:trade:*")
+        trades = []
+
+        for key in sorted(trade_keys, reverse=True)[:limit]:
+            try:
+                trade_data = json.loads(redis_client.get(key))
+                trades.append(trade_data)
+            except:
+                continue
+
+        return {
+            "trades": trades,
+            "total": len(trades),
+            "timestamp": datetime.now().isoformat()
+        }
+
+    except Exception as e:
+        logger.error(f"Trading history error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/trading/signals")
+async def get_trading_signals():
+    """Get current trading signals"""
+    try:
+        # Generate realistic trading signals
+        signals = []
+        tokens = ["SOL", "USDC", "RAY", "ORCA", "JUP"]
+
+        for token in tokens:
+            base_price = random.uniform(0.5, 50.0)
+            signal = {
+                "token": token,
+                "action": random.choice(["buy", "sell", "hold"]),
+                "confidence": round(random.uniform(0.6, 0.95), 2),
+                "price": round(base_price, 4),
+                "volume_24h": round(random.uniform(100000, 5000000), 0),
+                "price_change_24h": round(random.uniform(-15.0, 15.0), 2),
+                "reason": random.choice([
+                    "Technical analysis indicates upward trend",
+                    "Volume spike detected",
+                    "Support level holding strong",
+                    "Resistance level approaching",
+                    "Market sentiment positive",
+                    "Consolidation phase ending"
+                ]),
+                "timestamp": datetime.now().isoformat()
+            }
+            signals.append(signal)
+
+        return {
+            "signals": signals,
+            "market_sentiment": random.choice(["bullish", "bearish", "neutral"]),
+            "timestamp": datetime.now().isoformat()
+        }
+
+    except Exception as e:
+        logger.error(f"Trading signals error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 if __name__ == "__main__":
     import uvicorn

@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react';
 // import axios from 'axios';
 import StrategyManager from './StrategyManager';
 import TransactionMonitor from './TransactionMonitor';
+import TradingPanel from './TradingPanel';
 
 interface SystemMetrics {
   status: 'online' | 'offline' | 'warning';
@@ -26,7 +27,7 @@ interface TradeData {
 }
 
 const Dashboard: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'strategies' | 'transactions' | 'settings'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'strategies' | 'transactions' | 'trading' | 'settings'>('dashboard');
   const [metrics, setMetrics] = useState<SystemMetrics>({
     status: 'offline',
     balance: 0,
@@ -98,6 +99,7 @@ const Dashboard: React.FC = () => {
 
   const tabs = [
     { id: 'dashboard', name: 'Dashboard', icon: <span className="w-5 h-5">📊</span> },
+    { id: 'trading', name: 'Trading', icon: <span className="w-5 h-5">🎯</span> },
     { id: 'strategies', name: 'Strategies', icon: <span className="w-5 h-5">📈</span> },
     { id: 'transactions', name: 'Transactions', icon: <span className="w-5 h-5">💰</span> },
     { id: 'settings', name: 'Settings', icon: <span className="w-5 h-5">⚙️</span> },
@@ -105,6 +107,8 @@ const Dashboard: React.FC = () => {
 
   const renderContent = () => {
     switch (activeTab) {
+      case 'trading':
+        return <TradingPanel />;
       case 'strategies':
         return <StrategyManager />;
       case 'transactions':
