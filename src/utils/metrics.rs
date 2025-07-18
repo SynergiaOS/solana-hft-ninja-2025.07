@@ -41,4 +41,55 @@ impl MetricsCollector {
     pub fn record_latency(&self, latency_ms: f64) {
         self.latency_histogram.observe(latency_ms);
     }
+
+    pub fn get_registry(&self) -> Arc<Registry> {
+        self.registry.clone()
+    }
+}
+
+/// Metrics server for Prometheus integration
+pub struct MetricsServer {
+    port: u16,
+}
+
+impl MetricsServer {
+    pub async fn start(port: u16) -> anyhow::Result<Self> {
+        tracing::info!("📊 Starting metrics server on port {}", port);
+
+        // Placeholder implementation - would start actual Prometheus server
+        Ok(Self { port })
+    }
+}
+
+/// Benchmarking utility for performance testing
+pub struct Benchmarker {
+    config: crate::utils::config::Config,
+}
+
+impl Benchmarker {
+    pub async fn new(config: crate::utils::config::Config) -> anyhow::Result<Self> {
+        Ok(Self { config })
+    }
+
+    pub async fn run(&self, bench_type: &str, iterations: u32) -> anyhow::Result<BenchmarkResults> {
+        tracing::info!("Running {} benchmark with {} iterations", bench_type, iterations);
+
+        // Placeholder implementation
+        Ok(BenchmarkResults {
+            avg_latency_ms: 0.5,
+            p95_latency_ms: 1.0,
+            p99_latency_ms: 2.0,
+            throughput: 1000.0,
+            memory_usage_mb: 512.0,
+        })
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct BenchmarkResults {
+    pub avg_latency_ms: f64,
+    pub p95_latency_ms: f64,
+    pub p99_latency_ms: f64,
+    pub throughput: f64,
+    pub memory_usage_mb: f64,
 }

@@ -1,0 +1,321 @@
+# Strategy Optimization Flow Template
+# Analyzes current strategy performance and suggests optimizations
+
+id: strategy_optimization_analysis
+namespace: cerebro.optimization
+
+description: |
+  Comprehensive strategy optimization analysis.
+  Evaluates current strategy performance, identifies bottlenecks, and suggests improvements.
+
+labels:
+  environment: "{{ vars.environment }}"
+  type: "strategy_optimization"
+  category: "analysis"
+
+inputs:
+  - id: strategy_name
+    type: STRING
+    required: true
+    description: "Name of strategy to optimize (sandwich, arbitrage, etc.)"
+    
+  - id: analysis_period_hours
+    type: INT
+    defaults: 24
+    description: "Analysis period in hours"
+    
+  - id: optimization_focus
+    type: SELECT
+    defaults: "profit"
+    values:
+      - "profit"
+      - "latency"
+      - "success_rate"
+      - "risk_management"
+    description: "Primary optimization focus"
+
+variables:
+  cerebro_api_url: "{{ vars.cerebro_api_url }}"
+  hft_ninja_url: "{{ vars.hft_ninja_url }}"
+  prometheus_url: "{{ vars.prometheus_url }}"
+
+tasks:
+  # 1. Collect Strategy Performance Data
+  - id: collect_strategy_metrics
+    type: io.kestra.core.tasks.flows.Http
+    description: "Fetch strategy-specific performance metrics"
+    uri: "{{ vars.hft_ninja_url }}/api/strategies/{{ inputs.strategy_name }}/metrics"
+    method: GET
+    timeout: PT30S
+
+  # 2. Collect Historical Performance
+  - id: collect_historical_data
+    type: io.kestra.core.tasks.flows.Http
+    description: "Query historical performance data"
+    uri: "{{ vars.prometheus_url }}/api/v1/query_range"
+    method: GET
+    timeout: PT30S
+    options:
+      query: |
+        {
+          "query": "hft_strategy_profit{strategy=\"{{ inputs.strategy_name }}\"}",
+          "start": "{{ execution.startDate | dateAdd(-{{ inputs.analysis_period_hours }}, 'HOURS') | date('yyyy-MM-dd\'T\'HH:mm:ss\'Z\'') }}",
+          "end": "{{ execution.startDate | date('yyyy-MM-dd\'T\'HH:mm:ss\'Z\'') }}",
+          "step": "300s"
+        }
+
+  # 3. Analyze Strategy Performance
+  - id: analyze_strategy_performance
+    type: io.kestra.core.tasks.scripts.Python
+    description: "Comprehensive strategy performance analysis"
+    docker:
+      image: python:3.11-slim
+    beforeCommands:
+      - pip install pandas numpy scipy requests
+    script: |
+      import json
+      import pandas as pd
+      import numpy as np
+      from datetime import datetime, timedelta
+      import statistics
+      
+      # Load data
+      current_metrics = json.loads('{{ outputs.collect_strategy_metrics.body }}')
+      historical_data = json.loads('{{ outputs.collect_historical_data.body }}')
+      
+      # Extract key performance indicators
+      total_trades = current_metrics.get('total_trades', 0)
+      success_rate = current_metrics.get('success_rate', 0.0)
+      avg_profit = current_metrics.get('average_profit_sol', 0.0)
+      avg_latency = current_metrics.get('average_latency_ms', 0.0)
+      total_profit = current_metrics.get('total_profit_sol', 0.0)
+      
+      # Analyze historical trends
+      profit_history = []
+      if historical_data.get('data', {}).get('result'):
+          for series in historical_data['data']['result']:
+              for timestamp, value in series.get('values', []):
+                  profit_history.append(float(value))
+      
+      # Calculate performance metrics
+      analysis = {
+          "strategy_name": "{{ inputs.strategy_name }}",
+          "analysis_period_hours": {{ inputs.analysis_period_hours }},
+          "optimization_focus": "{{ inputs.optimization_focus }}",
+          "timestamp": datetime.now().isoformat(),
+          "current_performance": {
+              "total_trades": total_trades,
+              "success_rate": success_rate,
+              "average_profit_sol": avg_profit,
+              "average_latency_ms": avg_latency,
+              "total_profit_sol": total_profit,
+              "trades_per_hour": total_trades / {{ inputs.analysis_period_hours }} if {{ inputs.analysis_period_hours }} > 0 else 0
+          },
+          "performance_trends": {
+              "profit_trend": "stable",
+              "volatility": statistics.stdev(profit_history) if len(profit_history) > 1 else 0,
+              "consistency_score": success_rate * (1 - (statistics.stdev(profit_history) if len(profit_history) > 1 else 0))
+          },
+          "optimization_recommendations": [],
+          "risk_assessment": {
+              "risk_level": "medium",
+              "max_drawdown": min(profit_history) if profit_history else 0,
+              "profit_factor": max(profit_history) / abs(min(profit_history)) if profit_history and min(profit_history) < 0 else float('inf')
+          }
+      }
+      
+      # Generate optimization recommendations based on focus
+      focus = "{{ inputs.optimization_focus }}"
+      
+      if focus == "profit":
+          if avg_profit < 0.001:  # Less than 0.001 SOL average
+              analysis["optimization_recommendations"].append({
+                  "type": "profit_optimization",
+                  "action": "increase_minimum_profit_threshold",
+                  "reason": "Average profit per trade is below optimal threshold",
+                  "expected_impact": "15-25% profit increase",
+                  "confidence": 0.8
+              })
+          
+          if success_rate < 0.85:
+              analysis["optimization_recommendations"].append({
+                  "type": "profit_optimization", 
+                  "action": "improve_market_timing",
+                  "reason": "Success rate indicates suboptimal entry timing",
+                  "expected_impact": "10-20% profit increase",
+                  "confidence": 0.7
+              })
+      
+      elif focus == "latency":
+          if avg_latency > 100:
+              analysis["optimization_recommendations"].append({
+                  "type": "latency_optimization",
+                  "action": "optimize_rpc_connections",
+                  "reason": f"Average latency {avg_latency}ms exceeds target of 100ms",
+                  "expected_impact": "30-50% latency reduction",
+                  "confidence": 0.9
+              })
+          
+          analysis["optimization_recommendations"].append({
+              "type": "latency_optimization",
+              "action": "implement_connection_pooling",
+              "reason": "Connection pooling can reduce network overhead",
+              "expected_impact": "10-20% latency reduction",
+              "confidence": 0.8
+          })
+      
+      elif focus == "success_rate":
+          if success_rate < 0.9:
+              analysis["optimization_recommendations"].append({
+                  "type": "success_rate_optimization",
+                  "action": "enhance_market_condition_filtering",
+                  "reason": f"Success rate {success_rate:.1%} below target of 90%",
+                  "expected_impact": "5-15% success rate improvement",
+                  "confidence": 0.8
+              })
+      
+      # Risk management recommendations
+      if analysis["risk_assessment"]["max_drawdown"] < -0.1:  # More than 0.1 SOL loss
+          analysis["optimization_recommendations"].append({
+              "type": "risk_management",
+              "action": "implement_dynamic_position_sizing",
+              "reason": "Significant drawdown detected, need better risk controls",
+              "expected_impact": "50% drawdown reduction",
+              "confidence": 0.9
+          })
+      
+      print(json.dumps(analysis, indent=2))
+
+  # 4. Generate Optimization Plan
+  - id: generate_optimization_plan
+    type: io.kestra.core.tasks.flows.Http
+    description: "Generate detailed optimization plan using Cerebro AI"
+    uri: "{{ vars.cerebro_api_url }}/api/v1/cerebro/prompt"
+    method: POST
+    contentType: application/json
+    body: |
+      {
+        "prompt": "Based on the strategy analysis for {{ inputs.strategy_name }}, create a detailed optimization plan. Focus on {{ inputs.optimization_focus }}. Current success rate: {{ outputs.analyze_strategy_performance.vars.analysis.current_performance.success_rate }}, Average latency: {{ outputs.analyze_strategy_performance.vars.analysis.current_performance.average_latency_ms }}ms",
+        "context": {
+          "type": "strategy_optimization",
+          "strategy": "{{ inputs.strategy_name }}",
+          "analysis_data": "{{ outputs.analyze_strategy_performance.vars.analysis }}"
+        },
+        "user_id": "kestra_optimization_flow"
+      }
+
+  # 5. Store Optimization Results
+  - id: store_optimization_results
+    type: io.kestra.core.tasks.flows.Http
+    description: "Store optimization analysis in memory"
+    uri: "{{ vars.cerebro_api_url }}/api/memory/store"
+    method: POST
+    contentType: application/json
+    body: |
+      {
+        "content": "{{ outputs.analyze_strategy_performance.vars.analysis }}",
+        "context_type": "strategy_optimization_analysis",
+        "metadata": {
+          "source": "kestra_optimization_flow",
+          "strategy": "{{ inputs.strategy_name }}",
+          "optimization_focus": "{{ inputs.optimization_focus }}",
+          "execution_id": "{{ execution.id }}",
+          "timestamp": "{{ execution.startDate }}"
+        }
+      }
+
+  # 6. Create Implementation Tasks (Optional)
+  - id: create_implementation_tasks
+    type: io.kestra.core.tasks.scripts.Python
+    condition: "{{ outputs.analyze_strategy_performance.vars.analysis.optimization_recommendations | length > 0 }}"
+    description: "Create actionable implementation tasks"
+    docker:
+      image: python:3.11-slim
+    script: |
+      import json
+      from datetime import datetime, timedelta
+      
+      analysis = json.loads('{{ outputs.analyze_strategy_performance.vars.analysis }}')
+      recommendations = analysis.get('optimization_recommendations', [])
+      
+      implementation_tasks = []
+      
+      for i, rec in enumerate(recommendations):
+          task = {
+              "id": f"optimization_task_{i+1}",
+              "title": rec['action'].replace('_', ' ').title(),
+              "description": rec['reason'],
+              "type": rec['type'],
+              "priority": "high" if rec.get('confidence', 0) > 0.8 else "medium",
+              "expected_impact": rec.get('expected_impact', 'Unknown'),
+              "estimated_effort": "2-4 hours",  # Could be calculated based on task type
+              "due_date": (datetime.now() + timedelta(days=7)).isoformat(),
+              "status": "pending"
+          }
+          implementation_tasks.append(task)
+      
+      result = {
+          "strategy": "{{ inputs.strategy_name }}",
+          "total_tasks": len(implementation_tasks),
+          "tasks": implementation_tasks,
+          "created_at": datetime.now().isoformat()
+      }
+      
+      print(json.dumps(result, indent=2))
+
+  # 7. Send Optimization Report
+  - id: send_optimization_report
+    type: io.kestra.core.tasks.flows.Http
+    description: "Send optimization analysis report"
+    uri: "{{ vars.notification_webhook }}"
+    method: POST
+    contentType: application/json
+    body: |
+      {
+        "text": "🔧 Strategy Optimization Analysis Complete",
+        "attachments": [
+          {
+            "color": "{% if outputs.analyze_strategy_performance.vars.analysis.current_performance.success_rate > 0.85 %}good{% else %}warning{% endif %}",
+            "title": "{{ inputs.strategy_name | title }} Strategy Optimization - {{ execution.startDate | date('yyyy-MM-dd') }}",
+            "fields": [
+              {
+                "title": "Success Rate",
+                "value": "{{ outputs.analyze_strategy_performance.vars.analysis.current_performance.success_rate | round(3) * 100 }}%",
+                "short": true
+              },
+              {
+                "title": "Avg Latency",
+                "value": "{{ outputs.analyze_strategy_performance.vars.analysis.current_performance.average_latency_ms }}ms",
+                "short": true
+              },
+              {
+                "title": "Total Profit",
+                "value": "{{ outputs.analyze_strategy_performance.vars.analysis.current_performance.total_profit_sol }} SOL",
+                "short": true
+              },
+              {
+                "title": "Recommendations",
+                "value": "{{ outputs.analyze_strategy_performance.vars.analysis.optimization_recommendations | length }} optimization opportunities",
+                "short": true
+              }
+            ],
+            "text": "{{ outputs.generate_optimization_plan.body.result.response | truncate(500) }}"
+          }
+        ]
+      }
+
+# Triggers
+triggers:
+  # Manual trigger for specific strategy optimization
+  - id: manual_optimization_trigger
+    type: io.kestra.core.models.triggers.types.Webhook
+    key: "optimize_strategy"
+    
+  # Scheduled weekly optimization for all strategies
+  - id: weekly_optimization_schedule
+    type: io.kestra.core.models.triggers.types.Schedule
+    cron: "0 6 * * 1"  # Every Monday at 6 AM
+    inputs:
+      strategy_name: "sandwich"  # Default strategy
+      analysis_period_hours: 168  # 1 week
+      optimization_focus: "profit"

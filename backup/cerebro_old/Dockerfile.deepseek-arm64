@@ -1,0 +1,137 @@
+# DeepSeek-Math ARM64 Dockerfile for Oracle Free Tier
+# Optimized for ARM Ampere architecture with 4-bit quantization
+# Target: 6 GB RAM usage on 24 GB Oracle Free Tier instance
+
+FROM python:3.11-slim-bullseye
+
+# Set platform and architecture
+ARG BUILDPLATFORM=linux/arm64
+ARG TARGETPLATFORM=linux/arm64
+
+# ARM64 optimization flags
+ENV ARM_OPTIMIZATION=1
+ENV NEON_OPTIMIZATION=1
+ENV ARM64_SIMD=1
+ENV OMP_NUM_THREADS=4
+ENV ARM_COMPUTE_LIBRARY=1
+
+# Python optimization
+ENV PYTHONUNBUFFERED=1
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PIP_NO_CACHE_DIR=1
+ENV PIP_DISABLE_PIP_VERSION_CHECK=1
+
+# PyTorch ARM64 optimizations
+ENV PYTORCH_CUDA_ALLOC_CONF=max_split_size_mb:256
+ENV TORCH_COMPILE_DEBUG=0
+ENV TORCH_LOGS="+dynamo"
+
+# Install system dependencies optimized for ARM64
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    cmake \
+    git \
+    curl \
+    wget \
+    libblas-dev \
+    liblapack-dev \
+    libopenblas-dev \
+    gfortran \
+    pkg-config \
+    libhdf5-dev \
+    libffi-dev \
+    libssl-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+# Create app directory
+WORKDIR /app
+
+# Copy requirements first for better caching
+COPY requirements.deepseek-arm64.txt .
+
+# Install Python dependencies with ARM64 optimizations
+RUN pip install --no-cache-dir --upgrade pip setuptools wheel && \
+    pip install --no-cache-dir torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu && \
+    pip install --no-cache-dir -r requirements.deepseek-arm64.txt
+
+# Copy application code
+COPY ai/ ./ai/
+COPY config/ ./config/
+COPY utils/ ./utils/
+
+# Create necessary directories
+RUN mkdir -p /app/models /app/cache /app/logs
+
+# Set up model cache directory
+ENV HF_HOME=/app/cache
+ENV TRANSFORMERS_CACHE=/app/cache
+ENV HF_DATASETS_CACHE=/app/cache
+
+# ARM64 specific optimizations for model loading
+ENV TRANSFORMERS_OFFLINE=0
+ENV HF_HUB_DISABLE_PROGRESS_BARS=1
+ENV TOKENIZERS_PARALLELISM=false
+
+# Create startup script for ARM64 optimizations
+RUN cat > /app/start-arm64.sh << 'EOF'
+#!/bin/bash
+
+# ARM64 performance optimizations
+echo "Setting up ARM64 optimizations..."
+
+# CPU affinity for ARM cores
+export OMP_NUM_THREADS=4
+export MKL_NUM_THREADS=4
+export OPENBLAS_NUM_THREADS=4
+
+# ARM NEON optimizations
+export ARM_COMPUTE_LIBRARY=1
+export NEON_OPTIMIZATION=1
+
+# Memory optimizations for 6GB limit
+export PYTORCH_CUDA_ALLOC_CONF=max_split_size_mb:256
+export MALLOC_TRIM_THRESHOLD_=100000
+
+# Model quantization settings
+export USE_QUANTIZATION=true
+export QUANTIZATION_BITS=4
+export USE_LMCACHE=true
+export CACHE_SIZE_MB=512
+
+# Start the application
+echo "Starting DeepSeek-Math ARM64 server..."
+exec python -m ai.deepseek_api
+EOF
+
+RUN chmod +x /app/start-arm64.sh
+
+# Health check script
+RUN cat > /app/health-check.sh << 'EOF'
+#!/bin/bash
+curl -f http://localhost:8003/health || exit 1
+EOF
+
+RUN chmod +x /app/health-check.sh
+
+# Expose port
+EXPOSE 8003
+
+# Set resource limits for Oracle Free Tier
+ENV MEMORY_LIMIT=6G
+ENV CPU_LIMIT=1.5
+
+# Health check
+HEALTHCHECK --interval=60s --timeout=15s --start-period=120s --retries=3 \
+    CMD /app/health-check.sh
+
+# Use ARM64 optimized startup
+CMD ["/app/start-arm64.sh"]
+
+# Metadata
+LABEL maintainer="Solana HFT Ninja Team"
+LABEL description="DeepSeek-Math 7B ARM64 optimized for Oracle Free Tier"
+LABEL version="2025.07.18"
+LABEL architecture="arm64"
+LABEL oracle.free-tier="true"
+LABEL memory.limit="6GB"
+LABEL cpu.limit="1.5"

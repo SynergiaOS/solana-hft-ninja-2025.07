@@ -1,0 +1,235 @@
+# Hourly Performance Analysis Flow
+# Automatically analyzes trading performance every hour
+
+id: hourly_performance_analysis
+namespace: cerebro.analysis
+
+description: |
+  Automated hourly analysis of HFT trading performance.
+  Collects metrics, analyzes trends, and stores insights in DragonflyDB.
+
+labels:
+  environment: "{{ vars.environment }}"
+  type: "performance_analysis"
+  frequency: "hourly"
+
+inputs:
+  - id: analysis_depth
+    type: SELECT
+    defaults: "standard"
+    values:
+      - "quick"
+      - "standard" 
+      - "deep"
+    description: "Depth of analysis to perform"
+
+variables:
+  cerebro_api_url: "{{ vars.cerebro_api_url }}"
+  hft_ninja_url: "{{ vars.hft_ninja_url }}"
+  notification_webhook: "{{ vars.notification_webhook }}"
+
+tasks:
+  # 1. Collect HFT Performance Metrics
+  - id: collect_hft_metrics
+    type: io.kestra.core.tasks.flows.Http
+    description: "Fetch current HFT performance metrics"
+    uri: "{{ vars.hft_ninja_url }}/api/metrics"
+    method: GET
+    timeout: PT30S
+    retry:
+      maxAttempt: 3
+      delay: PT10S
+
+  # 2. Collect Prometheus Metrics
+  - id: collect_prometheus_metrics
+    type: io.kestra.core.tasks.flows.Http
+    description: "Query Prometheus for detailed metrics"
+    uri: "{{ vars.prometheus_url }}/api/v1/query_range"
+    method: GET
+    timeout: PT30S
+    options:
+      query: |
+        {
+          "query": "hft_profit_total",
+          "start": "{{ execution.startDate | dateAdd(-1, 'HOURS') | date('yyyy-MM-dd\'T\'HH:mm:ss\'Z\'') }}",
+          "end": "{{ execution.startDate | date('yyyy-MM-dd\'T\'HH:mm:ss\'Z\'') }}",
+          "step": "300s"
+        }
+
+  # 3. Process and Analyze Data
+  - id: analyze_performance
+    type: io.kestra.core.tasks.scripts.Python
+    description: "Analyze collected performance data"
+    docker:
+      image: python:3.11-slim
+    beforeCommands:
+      - pip install requests pandas numpy
+    script: |
+      import json
+      import pandas as pd
+      import numpy as np
+      from datetime import datetime, timedelta
+      
+      # Load data from previous tasks
+      hft_data = json.loads('{{ outputs.collect_hft_metrics.body }}')
+      prometheus_data = json.loads('{{ outputs.collect_prometheus_metrics.body }}')
+      
+      # Analysis logic
+      analysis_result = {
+          "timestamp": datetime.now().isoformat(),
+          "period": "1_hour",
+          "analysis_depth": "{{ inputs.analysis_depth }}",
+          "metrics": {
+              "total_trades": hft_data.get("total_trades", 0),
+              "total_profit_sol": hft_data.get("total_profit_sol", 0.0),
+              "success_rate": hft_data.get("success_rate", 0.0),
+              "average_latency_ms": hft_data.get("average_latency_ms", 0.0)
+          },
+          "trends": {
+              "profit_trend": "stable",  # Would calculate from prometheus data
+              "volume_trend": "increasing",
+              "latency_trend": "stable"
+          },
+          "alerts": [],
+          "recommendations": []
+      }
+      
+      # Check for alerts
+      if analysis_result["metrics"]["success_rate"] < 0.85:
+          analysis_result["alerts"].append({
+              "type": "warning",
+              "message": f"Success rate below threshold: {analysis_result['metrics']['success_rate']:.2%}",
+              "severity": "medium"
+          })
+      
+      if analysis_result["metrics"]["average_latency_ms"] > 100:
+          analysis_result["alerts"].append({
+              "type": "warning", 
+              "message": f"High latency detected: {analysis_result['metrics']['average_latency_ms']}ms",
+              "severity": "high"
+          })
+      
+      # Generate recommendations
+      if analysis_result["metrics"]["total_profit_sol"] > 0:
+          analysis_result["recommendations"].append({
+              "type": "optimization",
+              "message": "Consider increasing position sizes during profitable periods",
+              "confidence": 0.7
+          })
+      
+      print(json.dumps(analysis_result, indent=2))
+
+  # 4. Store Results in DragonflyDB
+  - id: store_analysis_results
+    type: io.kestra.core.tasks.flows.Http
+    description: "Store analysis results in Cerebro memory"
+    uri: "{{ vars.cerebro_api_url }}/api/memory/store"
+    method: POST
+    contentType: application/json
+    body: |
+      {
+        "content": "{{ outputs.analyze_performance.vars.analysis_result }}",
+        "context_type": "hourly_performance_analysis",
+        "metadata": {
+          "source": "kestra_hourly_flow",
+          "execution_id": "{{ execution.id }}",
+          "timestamp": "{{ execution.startDate }}",
+          "analysis_depth": "{{ inputs.analysis_depth }}"
+        }
+      }
+
+  # 5. Send Notifications (if alerts exist)
+  - id: send_notifications
+    type: io.kestra.core.tasks.flows.Http
+    description: "Send notifications for critical alerts"
+    condition: "{{ outputs.analyze_performance.vars.analysis_result.alerts | length > 0 }}"
+    uri: "{{ vars.notification_webhook }}"
+    method: POST
+    contentType: application/json
+    body: |
+      {
+        "text": "🚨 Cerebro Alert: {{ outputs.analyze_performance.vars.analysis_result.alerts | length }} issues detected in hourly analysis",
+        "attachments": [
+          {
+            "color": "warning",
+            "title": "Hourly Performance Analysis - {{ execution.startDate }}",
+            "fields": [
+              {
+                "title": "Success Rate",
+                "value": "{{ outputs.analyze_performance.vars.analysis_result.metrics.success_rate }}%",
+                "short": true
+              },
+              {
+                "title": "Total Profit",
+                "value": "{{ outputs.analyze_performance.vars.analysis_result.metrics.total_profit_sol }} SOL",
+                "short": true
+              },
+              {
+                "title": "Alerts",
+                "value": "{{ outputs.analyze_performance.vars.analysis_result.alerts | length }}",
+                "short": true
+              }
+            ]
+          }
+        ]
+      }
+
+  # 6. Update Cerebro Dashboard
+  - id: update_dashboard
+    type: io.kestra.core.tasks.flows.Http
+    description: "Trigger dashboard update with new analysis"
+    uri: "{{ vars.cerebro_api_url }}/api/dashboard/update"
+    method: POST
+    contentType: application/json
+    body: |
+      {
+        "type": "hourly_analysis_complete",
+        "data": "{{ outputs.analyze_performance.vars.analysis_result }}",
+        "execution_id": "{{ execution.id }}"
+      }
+
+# Error handling
+errors:
+  - id: error_notification
+    type: io.kestra.core.tasks.flows.Http
+    description: "Send error notification"
+    uri: "{{ vars.notification_webhook }}"
+    method: POST
+    contentType: application/json
+    body: |
+      {
+        "text": "❌ Cerebro Hourly Analysis Failed",
+        "attachments": [
+          {
+            "color": "danger",
+            "title": "Flow Execution Error - {{ execution.id }}",
+            "text": "The hourly performance analysis flow failed. Please check the logs.",
+            "fields": [
+              {
+                "title": "Execution ID",
+                "value": "{{ execution.id }}",
+                "short": true
+              },
+              {
+                "title": "Start Time", 
+                "value": "{{ execution.startDate }}",
+                "short": true
+              }
+            ]
+          }
+        ]
+      }
+
+# Triggers
+triggers:
+  # Run every hour
+  - id: hourly_schedule
+    type: io.kestra.core.models.triggers.types.Schedule
+    cron: "0 * * * *"  # Every hour at minute 0
+    inputs:
+      analysis_depth: "standard"
+
+  # Manual trigger for deep analysis
+  - id: manual_deep_analysis
+    type: io.kestra.core.models.triggers.types.Webhook
+    key: "deep_analysis_trigger"

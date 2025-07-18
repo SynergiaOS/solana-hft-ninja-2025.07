@@ -1,0 +1,140 @@
+id: scrapy_data_harvesting
+namespace: cerebro.scrapy
+
+description: "Advanced data harvesting using Scrapy spiders"
+
+schedule:
+  - id: hourly_scraping
+    type: io.kestra.core.models.triggers.types.Schedule
+    cron: "0 */1 * * *"  # Every hour
+
+variables:
+  scrapy_project_path: "/app/cerebro/scrapy_project"
+  redis_url: "redis://dragonflydb:6379/2"
+  output_path: "/tmp/scrapy_data"
+
+tasks:
+  # 1. Discord Monitoring
+  - id: discord_scraping
+    type: io.kestra.core.tasks.scripts.Bash
+    description: "Monitor Discord channels for alpha signals"
+    script: |
+      cd {{ vars.scrapy_project_path }}
+      scrapy crawl discord_monitor \
+        -s FEEDS='{"{{ vars.output_path }}/discord_data.json": {"format": "json"}}' \
+        -L INFO
+
+  # 2. Project Auditing
+  - id: project_auditing
+    type: io.kestra.core.tasks.scripts.Bash
+    description: "Audit new Solana projects"
+    script: |
+      cd {{ vars.scrapy_project_path }}
+      scrapy crawl project_auditor \
+        -s FEEDS='{"{{ vars.output_path }}/project_audit.json": {"format": "json"}}' \
+        -L INFO
+
+  # 3. News Aggregation
+  - id: news_aggregation
+    type: io.kestra.core.tasks.scripts.Bash
+    description: "Aggregate crypto news and sentiment"
+    script: |
+      cd {{ vars.scrapy_project_path }}
+      scrapy crawl news_aggregator \
+        -s FEEDS='{"{{ vars.output_path }}/news_data.json": {"format": "json"}}' \
+        -L INFO
+
+  # 4. DEX Monitoring
+  - id: dex_monitoring
+    type: io.kestra.core.tasks.scripts.Bash
+    description: "Monitor DEX activities and new listings"
+    script: |
+      cd {{ vars.scrapy_project_path }}
+      scrapy crawl dex_monitor \
+        -s FEEDS='{"{{ vars.output_path }}/dex_data.json": {"format": "json"}}' \
+        -L INFO
+
+  # 5. Data Processing
+  - id: process_scraped_data
+    type: io.kestra.core.tasks.scripts.Python
+    description: "Process and analyze scraped data"
+    script: |
+      import json
+      import redis
+      from datetime import datetime
+      
+      # Connect to Redis
+      r = redis.Redis.from_url("{{ vars.redis_url }}")
+      
+      # Process each data source
+      data_files = [
+          "discord_data.json",
+          "project_audit.json", 
+          "news_data.json",
+          "dex_data.json"
+      ]
+      
+      for file_name in data_files:
+          try:
+              with open(f"{{ vars.output_path }}/{file_name}", 'r') as f:
+                  data = json.load(f)
+                  
+              # Store in Redis with timestamp
+              key = f"scrapy:{file_name.replace('.json', '')}:{datetime.now().isoformat()}"
+              r.setex(key, 3600, json.dumps(data))  # Expire after 1 hour
+              
+              print(f"✅ Processed {file_name}: {len(data)} items")
+          except Exception as e:
+              print(f"❌ Error processing {file_name}: {e}")
+
+  # 6. Alert Generation
+  - id: generate_alerts
+    type: io.kestra.core.tasks.scripts.Python
+    description: "Generate alerts based on scraped data"
+    script: |
+      import json
+      import redis
+      import requests
+      
+      r = redis.Redis.from_url("{{ vars.redis_url }}")
+      
+      # Check for high-priority signals
+      alerts = []
+      
+      # Discord alpha signals
+      discord_keys = r.keys("scrapy:discord_data:*")
+      for key in discord_keys[-1:]:  # Latest only
+          data = json.loads(r.get(key))
+          for item in data:
+              if item.get('priority') == 'HIGH':
+                  alerts.append({
+                      'type': 'discord_alpha',
+                      'message': item.get('content'),
+                      'source': item.get('channel'),
+                      'timestamp': item.get('timestamp')
+                  })
+      
+      # Project audit warnings
+      audit_keys = r.keys("scrapy:project_audit:*")
+      for key in audit_keys[-1:]:
+          data = json.loads(r.get(key))
+          for item in data:
+              if item.get('risk_score', 0) > 7:
+                  alerts.append({
+                      'type': 'high_risk_project',
+                      'project': item.get('name'),
+                      'risk_score': item.get('risk_score'),
+                      'issues': item.get('issues')
+                  })
+      
+      # Send alerts to BFF
+      if alerts:
+          try:
+              response = requests.post(
+                  "http://bff:8000/api/alerts/scrapy",
+                  json={'alerts': alerts},
+                  timeout=10
+              )
+              print(f"✅ Sent {len(alerts)} alerts to BFF")
+          except Exception as e:
+              print(f"❌ Failed to send alerts: {e}")

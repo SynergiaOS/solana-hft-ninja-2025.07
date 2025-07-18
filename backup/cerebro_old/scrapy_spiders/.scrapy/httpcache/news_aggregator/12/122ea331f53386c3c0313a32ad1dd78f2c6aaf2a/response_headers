@@ -1,0 +1,27 @@
+Date: Fri, 18 Jul 2025 02:49:33 GMT
+Content-Type: text/html; charset=utf-8
+Content-Encoding: br
+X-Real-Ip: 77.46.97.48
+Cf-Ray: 960eaa9efa6feeb9-WAW
+Cf-Cache-Status: DYNAMIC
+Access-Control-Allow-Origin: *
+Cache-Control: no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0
+Last-Modified: Friday, 18-Jul-2025 02:49:33 UTC
+Strict-Transport-Security: max-age=31536000; includeSubDomains
+Vary: Accept-Encoding
+Access-Control-Allow-Headers: Origin, X-Requested-With, Content-Type, Accept, X-Language, baggage, sentry-trace, Access-Control-Allow-Origin, Cache-Control
+Cf-Apo-Via: origin,host
+Permissions-Policy: geolocation=(), microphone=(), camera=()
+Referrer-Policy: strict-origin-when-cross-origin
+X-Authorized: 1
+X-Cache-Status: BYPASS
+X-Content-Type-Options: nosniff
+X-Debug-Miss-Cache: 1
+X-Debug-Miss-Duke-Cache: 1
+X-Forwarded-Host: cointelegraph.com
+X-Frame-Options: SAMEORIGIN
+X-Host: cointelegraph.com
+X-Node: weu1
+X-Time: -
+Server: cloudflare
+Alt-Svc: h3=":443"; ma=86400

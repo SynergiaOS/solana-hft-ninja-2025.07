@@ -16,13 +16,14 @@ use solana_sdk::{
 use solana_transaction_status::{TransactionStatus, UiTransactionEncoding};
 use anyhow::{Result, Context, anyhow};
 use std::time::{Duration, Instant};
+use std::sync::Arc;
 use tokio::time::sleep;
 use tracing::{info, warn, error, debug};
 use crate::core::wallet::WalletManager;
 
 #[derive(Clone)]
 pub struct SolanaClient {
-    rpc_client: RpcClient,
+    rpc_client: Arc<RpcClient>,
     commitment: CommitmentConfig,
     timeout: Duration,
 }
@@ -51,12 +52,12 @@ impl SolanaClient {
         let commitment_config = CommitmentConfig { commitment };
         let timeout = Duration::from_millis(timeout_ms);
         
-        let rpc_client = RpcClient::new_with_commitment(rpc_url.to_string(), commitment_config);
-        
+        let rpc_client = Arc::new(RpcClient::new_with_commitment(rpc_url.to_string(), commitment_config));
+
         info!("🌐 Solana client initialized: {}", rpc_url);
         info!("⚙️ Commitment level: {:?}", commitment);
         info!("⏱️ Timeout: {}ms", timeout_ms);
-        
+
         Ok(Self {
             rpc_client,
             commitment: commitment_config,
@@ -83,7 +84,6 @@ impl SolanaClient {
     pub async fn get_balance(&self, pubkey: &Pubkey) -> Result<u64> {
         let balance = self.rpc_client
             .get_balance_with_commitment(pubkey, self.commitment)
-            .await
             .context("Failed to get balance")?
             .value;
         
@@ -96,7 +96,6 @@ impl SolanaClient {
     pub async fn get_account_info(&self, pubkey: &Pubkey) -> Result<AccountInfo> {
         let account = self.rpc_client
             .get_account_with_commitment(pubkey, self.commitment)
-            .await
             .context("Failed to get account info")?
             .value
             .ok_or_else(|| anyhow!("Account not found: {}", pubkey))?;
@@ -115,12 +114,9 @@ impl SolanaClient {
     }
 
     pub async fn get_recent_blockhash(&self) -> Result<Hash> {
-        let blockhash = self.rpc_client
+        let (blockhash, _) = self.rpc_client
             .get_latest_blockhash_with_commitment(self.commitment)
-            .await
-            .context("Failed to get recent blockhash")?
-            .value
-            .0;
+            .context("Failed to get recent blockhash")?;
         
         debug!("🔗 Recent blockhash: {}", blockhash);
         Ok(blockhash)
@@ -141,7 +137,7 @@ impl SolanaClient {
         
         // Create transaction
         let mut transaction = Transaction::new_unsigned(message);
-        transaction.sign(&[wallet.keypair.as_ref()], recent_blockhash);
+        transaction.sign(&[wallet.keypair()], recent_blockhash);
         
         info!("📤 Sending transaction: {}", transaction.signatures[0]);
         
@@ -156,7 +152,6 @@ impl SolanaClient {
         
         let signature = self.rpc_client
             .send_transaction_with_config(&transaction, config)
-            .await
             .context("Failed to send transaction")?;
         
         // Wait for confirmation
@@ -240,11 +235,11 @@ impl SolanaClient {
             max_supported_transaction_version: Some(0),
         };
         
-        match self.rpc_client.get_transaction_with_config(signature, config).await {
+        match self.rpc_client.get_transaction_with_config(signature, config) {
             Ok(transaction) => {
                 let slot = transaction.slot;
-                let meta = transaction.transaction.meta.unwrap_or_default();
-                let fee_lamports = meta.fee;
+                let meta = transaction.transaction.meta.as_ref();
+                let fee_lamports = meta.map(|m| m.fee).unwrap_or(0);
                 
                 // Determine confirmation status based on slot and commitment
                 let confirmation_status = match self.commitment.commitment {
@@ -286,7 +281,6 @@ impl SolanaClient {
                     inner_instructions: false,
                 },
             )
-            .await
             .context("Failed to simulate transaction")?;
         
         let result = simulation.value;
