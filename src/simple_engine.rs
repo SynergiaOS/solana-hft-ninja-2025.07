@@ -1,13 +1,16 @@
 //! Simple Engine with Bridge Integration
-//! 
+//!
 //! A minimal working implementation of the HFT engine with mempool bridge.
 
-use crate::{config::Config, market::MarketData, strategy::Strategy, bridge::*, core::WalletManager, monitoring::HftMetrics};
+use crate::{
+    bridge::*, config::Config, core::WalletManager, market::MarketData, monitoring::HftMetrics,
+    strategy::Strategy,
+};
 use anyhow::Result;
-use tokio::sync::broadcast;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
-use tracing::{info, warn, error, debug};
+use tokio::sync::broadcast;
+use tracing::{debug, error, info, warn};
 
 /// Simple HFT Engine with bridge integration
 pub struct SimpleEngine {
@@ -60,25 +63,34 @@ impl SimpleEngine {
     }
 
     /// Run engine with bridge integration
-    pub async fn run_with_bridge(&mut self, mut bridge_rx: broadcast::Receiver<Arc<BridgeEvent>>) -> Result<()> {
+    pub async fn run_with_bridge(
+        &mut self,
+        mut bridge_rx: broadcast::Receiver<Arc<BridgeEvent>>,
+    ) -> Result<()> {
         info!("🚀 Starting Simple HFT Engine with bridge integration...");
-        
+
         let start_time = Instant::now();
         let mut last_strategy_run = Instant::now();
         let strategy_interval = Duration::from_millis(self.config.strategy.update_interval_ms);
-        
+
         // Print startup info
         info!("⚙️  Configuration:");
         info!("   - Dry run: {}", self.dry_run);
-        info!("   - Strategy interval: {}ms", self.config.strategy.update_interval_ms);
-        info!("   - Max position size: {} SOL", self.config.trading.max_position_size_sol);
-        
+        info!(
+            "   - Strategy interval: {}ms",
+            self.config.strategy.update_interval_ms
+        );
+        info!(
+            "   - Max position size: {} SOL",
+            self.config.trading.max_position_size_sol
+        );
+
         loop {
             tokio::select! {
                 // HIGH PRIORITY: Real-time bridge events
                 Ok(event) = bridge_rx.recv() => {
                     let processing_start = Instant::now();
-                    
+
                     match self.process_bridge_event(&event).await {
                         Ok(result) => {
                             let latency = processing_start.elapsed();
@@ -117,7 +129,7 @@ impl SimpleEngine {
                         }
                     }
                 }
-                
+
                 // LOW PRIORITY: Regular strategy execution
                 _ = tokio::time::sleep(Duration::from_millis(100)) => {
                     if last_strategy_run.elapsed() >= strategy_interval {
@@ -126,10 +138,10 @@ impl SimpleEngine {
                         }
                         last_strategy_run = Instant::now();
                     }
-                    
+
                     // Update uptime
                     self.stats.uptime_seconds = start_time.elapsed().as_secs();
-                    
+
                     // Print stats every 60 seconds
                     if self.stats.uptime_seconds % 60 == 0 && self.stats.uptime_seconds > 0 {
                         self.print_stats();
@@ -142,18 +154,24 @@ impl SimpleEngine {
     /// Legacy run method for backward compatibility
     pub async fn run(&mut self) -> Result<()> {
         warn!("⚠️  Running engine without bridge integration - MEV opportunities will be missed!");
-        
+
         loop {
             if let Err(e) = self.run_regular_strategy().await {
                 error!("Strategy execution error: {}", e);
             }
-            
-            tokio::time::sleep(Duration::from_millis(self.config.strategy.update_interval_ms)).await;
+
+            tokio::time::sleep(Duration::from_millis(
+                self.config.strategy.update_interval_ms,
+            ))
+            .await;
         }
     }
-    
+
     /// Process bridge event
-    async fn process_bridge_event(&mut self, event: &BridgeEvent) -> Result<ProcessingResult, ProcessingError> {
+    async fn process_bridge_event(
+        &mut self,
+        event: &BridgeEvent,
+    ) -> Result<ProcessingResult, ProcessingError> {
         // Basic risk check
         if event.priority > 3 {
             return Ok(ProcessingResult {
@@ -162,53 +180,61 @@ impl SimpleEngine {
                 profit_estimate: 0.0,
             });
         }
-        
+
         // Process the event
         let result = self.event_processor.process_event(event).await?;
-        
+
         // If this is a real opportunity and not dry run, we would execute trades here
         if result.success && result.profit_estimate > 0.001 && !self.dry_run {
             // TODO: Implement actual trade execution
-            info!("💰 Would execute trade for {:.6} SOL profit", result.profit_estimate);
+            info!(
+                "💰 Would execute trade for {:.6} SOL profit",
+                result.profit_estimate
+            );
             self.stats.trades_executed += 1;
         }
-        
+
         Ok(result)
     }
-    
+
     /// Run regular trading strategy (non-MEV)
     async fn run_regular_strategy(&mut self) -> Result<()> {
         let market_snapshot = self.market_data.get_snapshot().await?;
         let orders = self.strategy.generate_orders(&market_snapshot).await?;
-        
+
         for order in orders {
             if !self.dry_run {
                 debug!("Executing regular order: {:?}", order);
                 // TODO: Implement order execution
             }
         }
-        
+
         Ok(())
     }
-    
+
     /// Print engine statistics
     fn print_stats(&self) {
         info!("📊 Engine Stats ({}s uptime):", self.stats.uptime_seconds);
         info!("   - Events processed: {}", self.stats.events_processed);
-        info!("   - Opportunities found: {}", self.stats.opportunities_found);
+        info!(
+            "   - Opportunities found: {}",
+            self.stats.opportunities_found
+        );
         info!("   - Trades executed: {}", self.stats.trades_executed);
         info!("   - Total profit: {:.6} SOL", self.stats.total_profit_sol);
-        
+
         if self.stats.events_processed > 0 {
-            let success_rate = (self.stats.opportunities_found as f64 / self.stats.events_processed as f64) * 100.0;
+            let success_rate = (self.stats.opportunities_found as f64
+                / self.stats.events_processed as f64)
+                * 100.0;
             info!("   - Success rate: {:.1}%", success_rate);
         }
-        
+
         let (processor_count, avg_time) = self.event_processor.get_stats();
         info!("   - Avg processing time: {:.1}ms", avg_time);
         info!("   - Processor events: {}", processor_count);
     }
-    
+
     /// Get current statistics
     pub fn get_stats(&self) -> &EngineStats {
         &self.stats
@@ -239,46 +265,49 @@ impl SimpleEngine {
 /// Enhanced mempool listener that uses the bridge
 pub async fn start_bridge_mempool_listener() -> Result<tokio::task::JoinHandle<()>> {
     use tokio::sync::mpsc;
-    
-    let (tx, mut rx) = mpsc::unbounded_channel::<Vec<u8>>();
-    
+
+    let (tx, rx) = mpsc::unbounded_channel::<Vec<u8>>();
+
     // Create event detector
     let event_detector = SimpleEventDetector::new();
-    
+
     // Simulate mempool listener (in real implementation, this would connect to Helius)
     let listener_handle = tokio::spawn(async move {
         info!("🎧 Starting bridge mempool listener...");
-        
+
         let mut transaction_count = 0;
         let mut event_count = 0;
-        
+
         // Simulate receiving transactions
         loop {
             // Simulate transaction data
             let tx_data = vec![0u8; 1500]; // Simulate large transaction
             transaction_count += 1;
-            
+
             // Detect events
             let events = event_detector.detect_events(&tx_data);
             event_count += events.len();
-            
+
             // Send events through bridge
             for event in events {
                 if let Err(e) = send_bridge_event(event) {
                     error!("Failed to send bridge event: {}", e);
                 }
             }
-            
+
             // Log progress
             if transaction_count % 100 == 0 {
-                info!("📈 Processed {} transactions, detected {} events", transaction_count, event_count);
+                info!(
+                    "📈 Processed {} transactions, detected {} events",
+                    transaction_count, event_count
+                );
             }
-            
+
             // Simulate transaction arrival rate (10 TPS)
             tokio::time::sleep(Duration::from_millis(100)).await;
         }
     });
-    
+
     info!("🌉 Bridge mempool listener started");
     Ok(listener_handle)
 }
@@ -287,7 +316,7 @@ pub async fn start_bridge_mempool_listener() -> Result<tokio::task::JoinHandle<(
 mod tests {
     use super::*;
     use crate::config::*;
-    
+
     fn create_test_config() -> Config {
         Config {
             solana: SolanaConfig {
@@ -297,7 +326,7 @@ mod tests {
             },
             wallet: WalletConfig {
                 private_key_path: "test.key".to_string(),
-                keypair_path: "test.json".to_string(),
+                keypair_path: "test_wallet.json".to_string(),
             },
             trading: TradingConfig {
                 initial_balance_sol: 10.0,
@@ -324,21 +353,44 @@ mod tests {
                 enable_ddos_protection: false,
                 rate_limit_rps: 100,
             },
+            wallet_tracker: None,
+            oumi_ai: None,
+            opensearch_ai: None,
+            lmcache: None,
+            ai: None,
         }
     }
-    
+
     #[tokio::test]
     async fn test_simple_engine_creation() {
-        let config = create_test_config();
+        // Create a test wallet file for the test
+        let test_keypair = solana_sdk::signature::Keypair::new();
+        let keypair_bytes = test_keypair.to_bytes();
+        let keypair_json = serde_json::to_string(&keypair_bytes.to_vec()).unwrap();
+        std::fs::write("test_wallet_creation.json", &keypair_json).unwrap();
+
+        let mut config = create_test_config();
+        config.wallet.keypair_path = "test_wallet_creation.json".to_string();
         let engine = SimpleEngine::new(config, true).await;
+
+        // Clean up test file
+        let _ = std::fs::remove_file("test_wallet_creation.json");
+
         assert!(engine.is_ok());
     }
-    
+
     #[tokio::test]
     async fn test_bridge_event_processing() {
-        let config = create_test_config();
+        // Create a test wallet file BEFORE creating config
+        let test_keypair = solana_sdk::signature::Keypair::new();
+        let keypair_bytes = test_keypair.to_bytes();
+        let keypair_json = serde_json::to_string(&keypair_bytes.to_vec()).unwrap();
+        std::fs::write("test_wallet_processing.json", &keypair_json).unwrap();
+
+        let mut config = create_test_config();
+        config.wallet.keypair_path = "test_wallet_processing.json".to_string();
         let mut engine = SimpleEngine::new(config, true).await.unwrap();
-        
+
         let event = BridgeEvent {
             event_type: EventType::DexTransaction {
                 signature: "test".to_string(),
@@ -348,9 +400,12 @@ mod tests {
             timestamp: 1234567890,
             priority: 0,
         };
-        
+
         let result = engine.process_bridge_event(&event).await;
         assert!(result.is_ok());
         assert!(result.unwrap().success);
+
+        // Clean up test file at the end
+        let _ = std::fs::remove_file("test_wallet_processing.json");
     }
 }

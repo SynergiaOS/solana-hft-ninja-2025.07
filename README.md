@@ -146,6 +146,40 @@ solana-hft-ninja-2025.07/
 
 See [DeepSeek-Math Integration Guide](docs/DEEPSEEK_MATH_INTEGRATION.md) for detailed setup.
 
+## 🔄 **WORKFLOW AUTOMATION & MCP INTEGRATION**
+
+### **n8n Visual Automation:**
+- **Visual Workflow Builder**: Drag-and-drop automation interface
+- **200+ Integrations**: Connect to external APIs, databases, and services
+- **Real-time Monitoring**: Automated health checks and alerting
+- **Data Ingestion**: Hourly market data collection from multiple sources
+
+### **MCP (Machine-readable Cooperative Protocol):**
+- **AI Assistant Integration**: Natural language control via Claude/Cursor
+- **Universal API Bridge**: Connect any external service to Cerebro
+- **Zero-Code Prototyping**: Build integrations without programming
+- **External Tool Access**: Leverage community AI models via Gradio
+
+### **Pre-configured Workflows:**
+- **Status Monitor**: System health checks every 5 minutes
+- **Data Ingestion**: Market data from CoinGecko, DexScreener, Twitter
+- **Alert System**: Real-time notifications for significant events
+- **Emergency Procedures**: Automated risk management responses
+
+### **MCP-Enabled Natural Language Control:**
+```bash
+# Start n8n + MCP integration
+./scripts/start-n8n-cerebro.sh
+
+# Example AI interactions:
+"What's my bot's current status?"
+"Analyze token EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v for risk"
+"Trigger emergency stop due to market volatility"
+"Get latest Solana DeFi news"
+```
+
+See [MCP Integration Guide](docs/MCP_INTEGRATION.md) for detailed setup.
+
 ## 🛠️ Configuration
 
 ### Environment Variables
@@ -217,16 +251,38 @@ impl Strategy for MyStrategy {
 
 ## 🧪 Testing
 
+**Status: ✅ ALL 64 TESTS PASSING**
+
+The system includes comprehensive test coverage across all components:
+
+### **Test Suites**
+- 🧠 **AI Brain Tests** (7 tests) - AI engines & coordination
+- 🌉 **Bridge Integration** (5 tests) - Bridge communication
+- ⚡ **Jito Integration** (7 tests) - Bundle execution & MEV
+- 🔄 **Mempool Integration** (8 tests) - Transaction processing
+- 📚 **Core Library** (37 tests) - Core functionality
+
+### **Quick Commands**
 ```bash
 # Run all tests
 cargo test
 
+# Run specific test suites
+cargo test --test ai_brain_tests
+cargo test --test integration_jito_test
+cargo test --lib
+
+# Debug mode
+RUST_LOG=debug cargo test -- --nocapture
+
 # Run benchmarks
 cargo bench
-
-# Run integration tests
-./scripts/test.sh
 ```
+
+### **Documentation**
+- 📖 [Testing Guide](docs/TESTING_GUIDE.md) - How to write and run tests
+- 📊 [Test Results](docs/TEST_RESULTS.md) - Latest test results and metrics
+- 🧪 [Testing Documentation](docs/TESTING.md) - Complete test coverage overview
 
 ## 🔒 Security
 
