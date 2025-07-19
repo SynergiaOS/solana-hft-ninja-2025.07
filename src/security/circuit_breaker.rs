@@ -3,9 +3,9 @@
 //! Automatic trading halt on consecutive losses or system errors
 
 use anyhow::Result;
+use parking_lot::RwLock;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
-use tokio::sync::RwLock;
 use tracing::{debug, error, info, warn};
 
 use super::{SecurityConfig, TransactionResult};
@@ -69,7 +69,7 @@ impl CircuitBreaker {
 
     /// Update circuit breaker with transaction result
     pub async fn update_with_result(&mut self, result: &TransactionResult) -> Result<()> {
-        let mut data = self.state.write().await;
+        let mut data = self.state.write();
 
         if result.success && result.profit_loss_sol >= 0.0 {
             // Successful trade
@@ -162,7 +162,7 @@ impl CircuitBreaker {
 
     /// Emergency open circuit breaker
     pub async fn emergency_open(&mut self, reason: &str) -> Result<()> {
-        let mut data = self.state.write().await;
+        let mut data = self.state.write();
 
         data.state = CircuitBreakerState::Open;
         data.emergency_reason = Some(reason.to_string());
@@ -175,7 +175,7 @@ impl CircuitBreaker {
 
     /// Manually close circuit breaker
     pub async fn manual_close(&mut self) -> Result<()> {
-        let mut data = self.state.write().await;
+        let mut data = self.state.write();
 
         data.state = CircuitBreakerState::Closed;
         data.consecutive_failures = 0;
@@ -189,7 +189,7 @@ impl CircuitBreaker {
 
     /// Attempt recovery (half-open state)
     pub async fn attempt_recovery(&mut self) -> Result<()> {
-        let mut data = self.state.write().await;
+        let mut data = self.state.write();
 
         if data.state == CircuitBreakerState::Open {
             data.state = CircuitBreakerState::HalfOpen;
@@ -215,7 +215,7 @@ impl CircuitBreaker {
 
     /// Get circuit breaker status
     pub async fn get_status(&self) -> CircuitBreakerStatus {
-        let data = self.state.read().await;
+        let data = self.state.read();
 
         let uptime_seconds = data
             .last_success_time

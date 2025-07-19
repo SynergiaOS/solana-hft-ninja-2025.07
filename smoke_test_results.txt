@@ -1,0 +1,14 @@
+# Smoke Test Results - Sun 20 Jul 2025 01:35:18 AM CEST
+SMOKE_TEST_RESULTS:
+total_trades=0
+0
+successful_trades=0
+0
+failed_trades=0
+0
+total_profit=
+max_drawdown=
+avg_latency_ms=
+p99_latency_ms=
+error_count=0
+0

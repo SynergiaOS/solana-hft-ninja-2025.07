@@ -62,6 +62,7 @@ hex = "0.4"
 crossbeam = "0.8"
 dashmap = "5.5"
 parking_lot = "0.12"
+bumpalo = "3.14"
 
 # Logging
 tracing = "0.1"

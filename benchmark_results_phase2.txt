@@ -1,0 +1,2 @@
+# FAZA 2 Benchmark Results - Sun 20 Jul 2025 01:12:33 AM CEST
+Redis Batch Queue: PASS - 2.00 >= 0

@@ -1,0 +1,17 @@
+# Assertion Results - Sun 20 Jul 2025 01:37:05 AM CEST
+P99 Latency: FAIL - ms not le 200ms
+Average Latency: FAIL - ms not le 100ms
+Total Profit: SKIP - No trades executed
+Max Drawdown: FAIL -  SOL not le 0.0002 SOL
+Error Count: PASS - 0 le 0
+Success Rate: SKIP - No trades executed
+Log Content: PASS - 749 lines
+Critical Errors: FAIL - 0
+0 critical errors
+
+ASSERTION_SUMMARY:
+passed=2
+failed=4
+total=6
+success_rate=33.33%
+OVERALL_STATUS=FAIL

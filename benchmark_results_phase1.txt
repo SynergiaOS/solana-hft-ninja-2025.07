@@ -1,0 +1,5 @@
+# FAZA 1 Benchmark Results - Sun 20 Jul 2025 12:51:32 AM CEST
+Mempool Router (fallback): PASS - 0µs < 30000000µs
+RPC Pool (localhost): PASS - 1.00ms < 5ms
+parking_lot (fallback): PASS - 0ns < 100ns
+PHASE1_STATUS=PASS

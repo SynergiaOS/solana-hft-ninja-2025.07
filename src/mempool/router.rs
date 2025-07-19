@@ -179,7 +179,8 @@ impl OpportunityDetector {
 
     /// Analyze parsed transaction for MEV opportunities
     pub fn detect_opportunities(&self, parsed_tx: &ParsedTransaction) -> Vec<MempoolEvent> {
-        let mut events = Vec::new();
+        // Pre-allocate with capacity for typical MEV opportunities (2-4 per tx)
+        let mut events = Vec::with_capacity(4);
         let timestamp_ns = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .unwrap()

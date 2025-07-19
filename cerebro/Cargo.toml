@@ -53,8 +53,7 @@ chrono = { version = "0.4", features = ["serde"] }
 rayon = "1.8"
 num_cpus = "1.16"
 
-# Arrow for zero-copy serialization
-arrow = { version = "50.0", features = ["ipc"] }
+# Removed Arrow due to version conflicts - using bincode instead
 
 # Performance monitoring
 prometheus = "0.13"
@@ -132,13 +131,7 @@ tracing = "0.1"
 # Use faster JSON parser
 serde_json = { git = "https://github.com/serde-rs/json", branch = "master" }
 
-# Build configuration
-[build]
-# Target specific optimizations
-rustflags = [
-    "-C", "target-cpu=native",  # Use native CPU features
-    "-C", "link-arg=-fuse-ld=lld"  # Use faster linker
-]
+# Build configuration moved to .cargo/config.toml
 
 # Documentation configuration
 [package.metadata.docs.rs]
