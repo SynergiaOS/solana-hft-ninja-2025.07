@@ -12,8 +12,10 @@ name = "hft-ninja"
 path = "src/main.rs"
 
 [[bin]]
-name = "helius-hft"
-path = "src/bin/helius_main.rs"
+name = "devnet_trader"
+path = "src/bin/devnet_trader.rs"
+
+
 
 [dependencies]
 # Solana

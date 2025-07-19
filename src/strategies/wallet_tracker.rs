@@ -1,29 +1,29 @@
 //! Wallet Tracker Strategy
-//! 
+//!
 //! Tracks successful developer wallets and snipes their new tokens
 //! Uses advanced risk scoring and ML-based prediction
 
-use anyhow::{Result, Context};
+use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use solana_sdk::pubkey::Pubkey;
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::RwLock;
-use tracing::{info, warn, debug, error};
+use tracing::{debug, error, info, warn};
 
-use crate::mempool::ParsedTransaction;
+use crate::cerebro::{metadata, CerebroIntegration};
 use crate::core::balance::BalanceTracker;
-use crate::execution::jito::{JitoExecutor, BundleTransaction, BundleResult};
+use crate::execution::jito::{BundleTransaction, JitoExecutor};
+use crate::mempool::ParsedTransaction;
 use crate::security::risk_limits::RiskLimits;
-use crate::cerebro::{CerebroIntegration, metadata};
 
 /// Red flag patterns to avoid
 const RED_FLAG_PATTERNS: [&str; 5] = [
-    "rug-pull", 
+    "rug-pull",
     "high-dev-allocation",
     "multi-rug-history",
     "fake-lock",
-    "suspicious-activity"
+    "suspicious-activity",
 ];
 
 /// Wallet Tracker Strategy Configuration
@@ -142,20 +142,20 @@ impl WalletTrackerLearner {
         weights.insert("holder_distribution".to_string(), 0.5);
         weights.insert("contract_safety".to_string(), 0.7);
         weights.insert("network_reputation".to_string(), 0.4);
-        
+
         Self {
             learning_rate,
             weights,
         }
     }
-    
+
     /// Update model based on trade outcome
     fn update_model(&mut self, outcome: TradeOutcome, signals: HashMap<String, f32>) {
         let adjustment = match outcome {
             TradeOutcome::Profit(p) => self.learning_rate * p as f32,
             TradeOutcome::Loss(l) => -self.learning_rate * l as f32 * 2.0,
         };
-        
+
         for (signal, value) in signals {
             if let Some(weight) = self.weights.get_mut(&signal) {
                 *weight += adjustment * value;
@@ -164,19 +164,19 @@ impl WalletTrackerLearner {
             }
         }
     }
-    
+
     /// Predict token success probability
     fn predict(&self, signals: HashMap<String, f32>) -> f64 {
         let mut score = 0.0;
         let mut total_weight = 0.0;
-        
+
         for (signal, value) in signals {
             if let Some(weight) = self.weights.get(&signal) {
                 score += *weight as f64 * value as f64;
                 total_weight += *weight as f64;
             }
         }
-        
+
         if total_weight > 0.0 {
             score / total_weight
         } else {
@@ -195,18 +195,18 @@ impl WalletTrackerStrategy {
         cerebro: Option<Arc<CerebroIntegration>>,
     ) -> Result<Self> {
         info!("🔍 Initializing Wallet Tracker Strategy...");
-        
+
         let risk_profile = RiskProfile {
             max_rug_score: config.max_rug_score,
             min_behavior_score: config.min_behavior_score,
             max_suspicious_connections: config.max_suspicious_connections,
             min_holder_count: config.min_holder_count,
         };
-        
+
         let learner = WalletTrackerLearner::new(0.01);
-        
+
         let tracked_wallets = Arc::new(RwLock::new(HashMap::new()));
-        
+
         Ok(Self {
             config,
             tracked_wallets,
@@ -218,41 +218,44 @@ impl WalletTrackerStrategy {
             cerebro,
         })
     }
-    
+
     /// Initialize tracked wallets
     pub async fn initialize(&self) -> Result<()> {
         info!("🔍 Loading tracked wallets...");
-        
+
         let mut wallets = self.tracked_wallets.write().await;
-        
+
         for wallet_str in &self.config.tracked_wallets {
             match Pubkey::try_from(wallet_str.as_str()) {
                 Ok(pubkey) => {
                     // Initialize with default values, will be updated later
-                    wallets.insert(pubkey, Wallet {
-                        address: pubkey,
-                        success_rate: 0.7, // Default starting value
-                        past_tokens: Vec::new(),
-                        transaction_history: Vec::new(),
-                        connections: Vec::new(),
-                        risk_score: 0.3,
-                        gem_score: 70.0,
-                        total_trades: 0,
-                        average_profit: 0.0,
-                        last_activity: chrono::Utc::now().timestamp() as u64,
-                    });
+                    wallets.insert(
+                        pubkey,
+                        Wallet {
+                            address: pubkey,
+                            success_rate: 0.7, // Default starting value
+                            past_tokens: Vec::new(),
+                            transaction_history: Vec::new(),
+                            connections: Vec::new(),
+                            risk_score: 0.3,
+                            gem_score: 70.0,
+                            total_trades: 0,
+                            average_profit: 0.0,
+                            last_activity: chrono::Utc::now().timestamp() as u64,
+                        },
+                    );
                     info!("🔍 Added tracked wallet: {}", pubkey);
-                },
+                }
                 Err(e) => {
                     warn!("🔍 Invalid wallet address: {} - {}", wallet_str, e);
                 }
             }
         }
-        
+
         info!("🔍 Loaded {} tracked wallets", wallets.len());
         Ok(())
     }
-    
+
     /// Process mempool transaction
     pub async fn process_transaction(&self, tx: &ParsedTransaction) -> Result<()> {
         // Check if transaction is from tracked wallet (use first account key as sender)
@@ -260,7 +263,10 @@ impl WalletTrackerStrategy {
 
         if let Some(sender) = tx.account_keys.first() {
             if let Some(wallet) = wallets.get(sender) {
-                debug!("🔍 Processing transaction from tracked wallet: {}", wallet.address);
+                debug!(
+                    "🔍 Processing transaction from tracked wallet: {}",
+                    wallet.address
+                );
 
                 // Analyze transaction
                 let action = self.determine_action_type(tx);
@@ -277,14 +283,16 @@ impl WalletTrackerStrategy {
                                 Some(wallet.risk_score),
                             );
 
-                            let _ = cerebro.notify_wallet(
-                                &wallet.address.to_string(),
-                                "new_token_creation",
-                                Some(&token.address.to_string()),
-                                None,
-                                0.8, // High confidence for tracked wallet
-                                metadata,
-                            ).await;
+                            let _ = cerebro
+                                .notify_wallet(
+                                    &wallet.address.to_string(),
+                                    "new_token_creation",
+                                    Some(&token.address.to_string()),
+                                    None,
+                                    0.8, // High confidence for tracked wallet
+                                    metadata,
+                                )
+                                .await;
                         }
 
                         if self.should_snipe(&wallet, &token).await? {
@@ -297,7 +305,7 @@ impl WalletTrackerStrategy {
 
         Ok(())
     }
-    
+
     /// Determine action type from transaction
     fn determine_action_type(&self, tx: &ParsedTransaction) -> ActionType {
         // Check for token creation in instructions
@@ -316,8 +324,12 @@ impl WalletTrackerStrategy {
         // Check for liquidity actions in DEX interactions
         for dex in &tx.dex_interactions {
             match dex.instruction_type {
-                crate::mempool::dex::InstructionType::AddLiquidity => return ActionType::AddLiquidity,
-                crate::mempool::dex::InstructionType::RemoveLiquidity => return ActionType::RemoveLiquidity,
+                crate::mempool::dex::InstructionType::AddLiquidity => {
+                    return ActionType::AddLiquidity
+                }
+                crate::mempool::dex::InstructionType::RemoveLiquidity => {
+                    return ActionType::RemoveLiquidity
+                }
                 crate::mempool::dex::InstructionType::Swap => return ActionType::Swap,
                 _ => {}
             }
@@ -325,14 +337,14 @@ impl WalletTrackerStrategy {
 
         ActionType::Unknown
     }
-    
+
     /// Extract token data from transaction
     async fn extract_token_data(&self, tx: &ParsedTransaction) -> Result<Option<TokenData>> {
         // Implementation depends on transaction structure
         // This is a placeholder
         Ok(None)
     }
-    
+
     /// Decide whether to snipe a token
     async fn should_snipe(&self, wallet: &Wallet, token: &TokenData) -> Result<bool> {
         // Check risk profile
@@ -340,50 +352,67 @@ impl WalletTrackerStrategy {
             debug!("🔍 Token risk score too high: {}", token.risk_score);
             return Ok(false);
         }
-        
+
         // Check liquidity
         if token.liquidity_sol < self.config.min_liquidity_sol {
             debug!("🔍 Token liquidity too low: {}", token.liquidity_sol);
             return Ok(false);
         }
-        
+
         // Check creator share
         if token.creator_share > self.config.max_creator_share {
             debug!("🔍 Creator share too high: {}", token.creator_share);
             return Ok(false);
         }
-        
+
         // Check holder count
         if token.holder_count < self.risk_profile.min_holder_count {
             debug!("🔍 Holder count too low: {}", token.holder_count);
             return Ok(false);
         }
-        
+
         // Calculate final score
         let mut signals = HashMap::new();
         signals.insert("success_history".to_string(), wallet.success_rate as f32);
-        signals.insert("liquidity_ratio".to_string(), (token.liquidity_sol / 10.0) as f32);
-        signals.insert("holder_distribution".to_string(), (token.holder_count as f32 / 100.0).min(1.0));
-        signals.insert("contract_safety".to_string(), (1.0 - token.risk_score) as f32);
-        signals.insert("network_reputation".to_string(), (wallet.gem_score / 100.0) as f32);
-        
+        signals.insert(
+            "liquidity_ratio".to_string(),
+            (token.liquidity_sol / 10.0) as f32,
+        );
+        signals.insert(
+            "holder_distribution".to_string(),
+            (token.holder_count as f32 / 100.0).min(1.0),
+        );
+        signals.insert(
+            "contract_safety".to_string(),
+            (1.0 - token.risk_score) as f32,
+        );
+        signals.insert(
+            "network_reputation".to_string(),
+            (wallet.gem_score / 100.0) as f32,
+        );
+
         let score = self.learner.predict(signals);
-        
+
         debug!("🔍 Token score: {}", score);
-        
+
         Ok(score > 0.7) // Threshold for sniping
     }
-    
+
     /// Execute token snipe
     async fn execute_snipe(&self, wallet: &Wallet, token: &TokenData) -> Result<()> {
-        info!("🔍 Sniping token: {} from wallet: {}", token.address, wallet.address);
-        
+        info!(
+            "🔍 Sniping token: {} from wallet: {}",
+            token.address, wallet.address
+        );
+
         // Calculate position size
         let position_size = self.calculate_position_size(wallet, token);
-        
+
         // Build snipe bundle
-        let bundle = self.build_snipe_bundle(wallet, token, position_size).await?;
-        
+        let bundle = self
+            .build_snipe_bundle(wallet, token, position_size)
+            .await?;
+
         // Execute bundle
         match self.jito_executor.execute_bundle(bundle).await {
             Ok(result) => {
@@ -398,61 +427,69 @@ impl WalletTrackerStrategy {
                         None, // bundle_position
                     );
 
-                    let _ = cerebro.notify_execution(
-                        &result.bundle_id,
-                        "wallet_tracker",
-                        &token.address.to_string(),
-                        "success",
-                        position_size, // Assume this is profit for now
-                        50, // execution_time_ms (placeholder)
-                        0, // gas_used (placeholder)
-                        Some(&wallet.address.to_string()),
-                        metadata,
-                    ).await;
+                    let _ = cerebro
+                        .notify_execution(
+                            &result.bundle_id,
+                            "wallet_tracker",
+                            &token.address.to_string(),
+                            "success",
+                            position_size, // Assume this is profit for now
+                            50,            // execution_time_ms (placeholder)
+                            0,             // gas_used (placeholder)
+                            Some(&wallet.address.to_string()),
+                            metadata,
+                        )
+                        .await;
                 }
 
                 Ok(())
-            },
+            }
             Err(e) => {
                 error!("🔍 Failed to execute snipe bundle: {}", e);
 
                 // Notify Cerebro about failure
                 if let Some(cerebro) = &self.cerebro {
-                    let metadata = metadata::trade_execution(
-                        None, None, Some("wallet_tracker_snipe"), None,
-                    );
+                    let metadata =
+                        metadata::trade_execution(None, None, Some("wallet_tracker_snipe"), None);
 
-                    let _ = cerebro.notify_execution(
-                        "failed_bundle",
-                        "wallet_tracker",
-                        &token.address.to_string(),
-                        "failure",
-                        0.0, // No profit on failure
-                        0, 0,
-                        Some(&wallet.address.to_string()),
-                        metadata,
-                    ).await;
+                    let _ = cerebro
+                        .notify_execution(
+                            "failed_bundle",
+                            "wallet_tracker",
+                            &token.address.to_string(),
+                            "failure",
+                            0.0, // No profit on failure
+                            0,
+                            0,
+                            Some(&wallet.address.to_string()),
+                            metadata,
+                        )
+                        .await;
                 }
 
                 Err(e.into())
             }
         }
     }
-    
+
     /// Calculate position size based on wallet and token
     fn calculate_position_size(&self, wallet: &Wallet, token: &TokenData) -> f64 {
         // Formula: base * success^2 * risk_modifier
         let base = self.config.base_position_sol;
         let success_factor = wallet.success_rate.powi(2);
         let risk_modifier = 1.0 - token.risk_score;
-        
+
         // Apply limits
-        (base * success_factor * risk_modifier)
-            .clamp(0.01, self.config.max_position_sol)
+        (base * success_factor * risk_modifier).clamp(0.01, self.config.max_position_sol)
     }
-    
+
     /// Build Jito bundle for sniping
-    async fn build_snipe_bundle(&self, _wallet: &Wallet, _token: &TokenData, _position_size: f64) -> Result<Vec<BundleTransaction>> {
+    async fn build_snipe_bundle(
+        &self,
+        _wallet: &Wallet,
+        _token: &TokenData,
+        _position_size: f64,
+    ) -> Result<Vec<BundleTransaction>> {
         // Implementation depends on Jito executor
         // This is a placeholder - would build actual swap transactions
         Ok(Vec::new())

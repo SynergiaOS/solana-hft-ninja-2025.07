@@ -108,6 +108,58 @@ services:
       retries: 3
     restart: unless-stopped
 
+  # 🔄 n8n Workflow Automation with MCP Support
+  n8n:
+    image: n8nio/n8n:latest
+    container_name: n8n-automation
+    restart: unless-stopped
+    environment:
+      - N8N_BASIC_AUTH_ACTIVE=true
+      - N8N_BASIC_AUTH_USER=admin
+      - N8N_BASIC_AUTH_PASSWORD=cerebro123
+      - N8N_HOST=0.0.0.0
+      - N8N_PORT=5678
+      - N8N_PROTOCOL=http
+      - WEBHOOK_URL=http://n8n:5678
+      - GENERIC_TIMEZONE=UTC
+      - N8N_LOG_LEVEL=info
+      - N8N_METRICS=true
+      - N8N_DIAGNOSTICS_ENABLED=false
+      - N8N_VERSION_NOTIFICATIONS_ENABLED=false
+      - N8N_TEMPLATES_ENABLED=true
+      - N8N_ONBOARDING_FLOW_DISABLED=true
+      - N8N_PERSONALIZATION_ENABLED=false
+      # Integration with Cerebro services
+      - CEREBRO_BFF_URL=http://cerebro-bff:8000
+      - HFT_NINJA_URL=http://hft-ninja:8080
+      - PROMETHEUS_URL=http://prometheus:9090
+      - GRAFANA_URL=http://grafana:3000
+    volumes:
+      - n8n-data:/home/node/.n8n
+      - ./n8n/workflows:/home/node/.n8n/workflows
+      - ./n8n/credentials:/home/node/.n8n/credentials
+      - ./n8n/nodes:/home/node/.n8n/nodes
+      - ./n8n/mcp:/home/node/.n8n/mcp
+    ports:
+      - "5678:5678"  # n8n UI
+      - "3001:3001"  # MCP Server
+    networks:
+      - hft-network
+    depends_on:
+      - hft-ninja
+      - prometheus
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:5678/healthz || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+        reservations:
+          memory: 512M
+
 volumes:
   prometheus_data:
     driver: local
@@ -117,6 +169,9 @@ volumes:
   deepseek_models:
     driver: local
   deepseek_cache:
+    driver: local
+  # 🔄 n8n volumes
+  n8n-data:
     driver: local
 
 networks:

@@ -1,27 +1,27 @@
 //! Protocol-Specific MEV Strategies
-//! 
+//!
 //! Specialized strategies for specific Solana protocols
 
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use tracing::{info, warn, debug};
+use tracing::{debug, info};
 
 /// Protocol-specific strategy configuration
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ProtocolConfig {
     /// Raydium-specific settings
     pub raydium: RaydiumConfig,
-    
+
     /// Orca-specific settings
     pub orca: OrcaConfig,
-    
+
     /// Jupiter-specific settings
     pub jupiter: JupiterConfig,
-    
+
     /// Serum-specific settings
     pub serum: SerumConfig,
-    
+
     /// Mango-specific settings
     pub mango: MangoConfig,
 }
@@ -238,15 +238,15 @@ impl ProtocolSpecificStrategy {
     /// Create new protocol-specific strategy
     pub fn new(config: ProtocolConfig) -> Self {
         info!("🎯 Initializing Protocol-Specific Strategies...");
-        
+
         let raydium_strategy = RaydiumStrategy::new(config.raydium.clone());
         let orca_strategy = OrcaStrategy::new(config.orca.clone());
         let jupiter_strategy = JupiterStrategy::new(config.jupiter.clone());
         let serum_strategy = SerumStrategy::new(config.serum.clone());
         let mango_strategy = MangoStrategy::new(config.mango.clone());
-        
+
         info!("✅ Protocol-Specific Strategies initialized");
-        
+
         Self {
             config,
             raydium_strategy,
@@ -256,11 +256,14 @@ impl ProtocolSpecificStrategy {
             mango_strategy,
         }
     }
-    
+
     /// Analyze transaction for protocol-specific opportunities
-    pub async fn analyze_transaction(&mut self, tx: &crate::mempool::ParsedTransaction) -> Result<Vec<ProtocolOpportunity>> {
+    pub async fn analyze_transaction(
+        &mut self,
+        tx: &crate::mempool::ParsedTransaction,
+    ) -> Result<Vec<ProtocolOpportunity>> {
         let mut opportunities = Vec::new();
-        
+
         // Determine which protocol the transaction interacts with
         let protocol = self.identify_protocol_from_accounts(&tx.account_keys);
         match protocol {
@@ -293,12 +296,15 @@ impl ProtocolSpecificStrategy {
                 debug!("Unknown protocol for transaction");
             }
         }
-        
+
         Ok(opportunities)
     }
-    
+
     /// Identify protocol from account keys
-    fn identify_protocol_from_accounts(&self, account_keys: &[solana_sdk::pubkey::Pubkey]) -> Option<Protocol> {
+    fn identify_protocol_from_accounts(
+        &self,
+        account_keys: &[solana_sdk::pubkey::Pubkey],
+    ) -> Option<Protocol> {
         for key in account_keys {
             let key_str = key.to_string();
             if key_str.contains("raydium") {
@@ -347,7 +353,10 @@ impl RaydiumStrategy {
     }
 
     /// Analyze Raydium transaction
-    pub async fn analyze_transaction(&mut self, tx: &crate::mempool::ParsedTransaction) -> Result<Option<ProtocolOpportunity>> {
+    pub async fn analyze_transaction(
+        &mut self,
+        tx: &crate::mempool::ParsedTransaction,
+    ) -> Result<Option<ProtocolOpportunity>> {
         // Check for new pool creation or large swaps
         if self.config.enable_liquidity_sniping {
             if let Some(profit) = self.detect_liquidity_opportunity(tx).await? {
@@ -368,7 +377,10 @@ impl RaydiumStrategy {
     }
 
     /// Detect liquidity sniping opportunity
-    async fn detect_liquidity_opportunity(&self, tx: &crate::mempool::ParsedTransaction) -> Result<Option<f64>> {
+    async fn detect_liquidity_opportunity(
+        &self,
+        tx: &crate::mempool::ParsedTransaction,
+    ) -> Result<Option<f64>> {
         // Simplified detection logic
         if tx.account_keys.len() > 10 {
             // Potential new pool or large liquidity addition
@@ -389,7 +401,10 @@ impl OrcaStrategy {
     }
 
     /// Analyze Orca transaction
-    pub async fn analyze_transaction(&mut self, tx: &crate::mempool::ParsedTransaction) -> Result<Option<ProtocolOpportunity>> {
+    pub async fn analyze_transaction(
+        &mut self,
+        tx: &crate::mempool::ParsedTransaction,
+    ) -> Result<Option<ProtocolOpportunity>> {
         // Check for concentrated liquidity opportunities
         if self.config.enable_concentrated_liquidity {
             if let Some(profit) = self.detect_whirlpool_opportunity(tx).await? {
@@ -410,7 +425,10 @@ impl OrcaStrategy {
     }
 
     /// Detect Whirlpool opportunity
-    async fn detect_whirlpool_opportunity(&self, tx: &crate::mempool::ParsedTransaction) -> Result<Option<f64>> {
+    async fn detect_whirlpool_opportunity(
+        &self,
+        tx: &crate::mempool::ParsedTransaction,
+    ) -> Result<Option<f64>> {
         // Simplified detection logic - check if any account key suggests Orca
         if tx.account_keys.len() > 5 {
             return Ok(Some(0.015)); // 0.015 SOL profit
@@ -430,7 +448,10 @@ impl JupiterStrategy {
     }
 
     /// Analyze Jupiter transaction
-    pub async fn analyze_transaction(&mut self, tx: &crate::mempool::ParsedTransaction) -> Result<Option<ProtocolOpportunity>> {
+    pub async fn analyze_transaction(
+        &mut self,
+        tx: &crate::mempool::ParsedTransaction,
+    ) -> Result<Option<ProtocolOpportunity>> {
         // Check for route optimization opportunities
         if self.config.enable_route_optimization {
             if let Some(profit) = self.detect_route_opportunity(tx).await? {
@@ -451,7 +472,10 @@ impl JupiterStrategy {
     }
 
     /// Detect route optimization opportunity
-    async fn detect_route_opportunity(&self, tx: &crate::mempool::ParsedTransaction) -> Result<Option<f64>> {
+    async fn detect_route_opportunity(
+        &self,
+        tx: &crate::mempool::ParsedTransaction,
+    ) -> Result<Option<f64>> {
         // Simplified detection logic
         if tx.account_keys.len() > 5 {
             return Ok(Some(0.01)); // 0.01 SOL profit from better routing
@@ -471,7 +495,10 @@ impl SerumStrategy {
     }
 
     /// Analyze Serum transaction
-    pub async fn analyze_transaction(&mut self, tx: &crate::mempool::ParsedTransaction) -> Result<Option<ProtocolOpportunity>> {
+    pub async fn analyze_transaction(
+        &mut self,
+        tx: &crate::mempool::ParsedTransaction,
+    ) -> Result<Option<ProtocolOpportunity>> {
         // Check for order book sniping opportunities
         if self.config.enable_order_book_sniping {
             if let Some(profit) = self.detect_order_book_opportunity(tx).await? {
@@ -492,7 +519,10 @@ impl SerumStrategy {
     }
 
     /// Detect order book opportunity
-    async fn detect_order_book_opportunity(&self, tx: &crate::mempool::ParsedTransaction) -> Result<Option<f64>> {
+    async fn detect_order_book_opportunity(
+        &self,
+        tx: &crate::mempool::ParsedTransaction,
+    ) -> Result<Option<f64>> {
         // Simplified detection logic
         if tx.account_keys.len() > 8 {
             return Ok(Some(0.008)); // 0.008 SOL profit
@@ -512,7 +542,10 @@ impl MangoStrategy {
     }
 
     /// Analyze Mango transaction
-    pub async fn analyze_transaction(&mut self, tx: &crate::mempool::ParsedTransaction) -> Result<Option<ProtocolOpportunity>> {
+    pub async fn analyze_transaction(
+        &mut self,
+        tx: &crate::mempool::ParsedTransaction,
+    ) -> Result<Option<ProtocolOpportunity>> {
         // Check for liquidation opportunities
         if self.config.enable_liquidations {
             if let Some(profit) = self.detect_liquidation_opportunity(tx).await? {
@@ -533,7 +566,10 @@ impl MangoStrategy {
     }
 
     /// Detect liquidation opportunity
-    async fn detect_liquidation_opportunity(&self, tx: &crate::mempool::ParsedTransaction) -> Result<Option<f64>> {
+    async fn detect_liquidation_opportunity(
+        &self,
+        tx: &crate::mempool::ParsedTransaction,
+    ) -> Result<Option<f64>> {
         // Simplified detection logic
         if tx.account_keys.len() > 6 {
             return Ok(Some(0.05)); // 0.05 SOL liquidation bonus

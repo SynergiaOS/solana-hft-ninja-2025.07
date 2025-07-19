@@ -11,17 +11,18 @@ pub struct MetricsCollector {
 impl MetricsCollector {
     pub fn new() -> Result<Self, Box<dyn std::error::Error>> {
         let registry = Arc::new(Registry::new());
-        
+
         let trades_total = Counter::new("trades_total", "Total number of trades")?;
         let pnl_total = Gauge::new("pnl_total", "Total P&L in USD")?;
-        let latency_histogram = Histogram::with_opts(
-            prometheus::HistogramOpts::new("trade_latency", "Trade execution latency in ms")
-        )?;
-        
+        let latency_histogram = Histogram::with_opts(prometheus::HistogramOpts::new(
+            "trade_latency",
+            "Trade execution latency in ms",
+        ))?;
+
         registry.register(Box::new(trades_total.clone()))?;
         registry.register(Box::new(pnl_total.clone()))?;
         registry.register(Box::new(latency_histogram.clone()))?;
-        
+
         Ok(Self {
             registry,
             trades_total,
@@ -72,7 +73,11 @@ impl Benchmarker {
     }
 
     pub async fn run(&self, bench_type: &str, iterations: u32) -> anyhow::Result<BenchmarkResults> {
-        tracing::info!("Running {} benchmark with {} iterations", bench_type, iterations);
+        tracing::info!(
+            "Running {} benchmark with {} iterations",
+            bench_type,
+            iterations
+        );
 
         // Placeholder implementation
         Ok(BenchmarkResults {

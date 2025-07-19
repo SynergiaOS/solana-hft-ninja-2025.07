@@ -2,11 +2,12 @@
 
 // Metrics macros are used with full path
 use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::Arc;
 use std::time::Instant;
 
-/// Mempool listener metrics collector
+/// Internal metrics data
 #[derive(Debug, Default)]
-pub struct MempoolMetrics {
+struct MempoolMetricsData {
     pub transactions_processed: AtomicU64,
     pub bytes_received: AtomicU64,
     pub connection_attempts: AtomicU64,
@@ -16,50 +17,53 @@ pub struct MempoolMetrics {
     pub memory_usage_bytes: AtomicU64,
 }
 
+/// Mempool listener metrics collector (thread-safe, cloneable)
+#[derive(Debug, Clone)]
+pub struct MempoolMetrics {
+    data: Arc<MempoolMetricsData>,
+}
+
 impl MempoolMetrics {
     pub fn new() -> Self {
-        Self::register_metrics();
-        Self::default()
-    }
-
-    fn register_metrics() {
-        // Metrics are registered automatically when first used
-        // This is just a placeholder for future metric registration
+        Self {
+            data: Arc::new(MempoolMetricsData::default()),
+        }
     }
 
     pub fn increment_transactions_processed(&self) {
-        self.transactions_processed.fetch_add(1, Ordering::Relaxed);
-        // Metrics simplified for compilation
+        self.data
+            .transactions_processed
+            .fetch_add(1, Ordering::Relaxed);
     }
 
     pub fn add_bytes_received(&self, bytes: u64) {
-        self.bytes_received.fetch_add(bytes, Ordering::Relaxed);
-        // Metrics simplified for compilation
+        self.data.bytes_received.fetch_add(bytes, Ordering::Relaxed);
     }
 
     pub fn increment_connection_attempts(&self) {
-        self.connection_attempts.fetch_add(1, Ordering::Relaxed);
-        // Metrics simplified for compilation
+        self.data
+            .connection_attempts
+            .fetch_add(1, Ordering::Relaxed);
     }
 
     pub fn increment_connection_failures(&self) {
-        self.connection_failures.fetch_add(1, Ordering::Relaxed);
-        // Metrics simplified for compilation
+        self.data
+            .connection_failures
+            .fetch_add(1, Ordering::Relaxed);
     }
 
     pub fn increment_deserialization_errors(&self) {
-        self.deserialization_errors.fetch_add(1, Ordering::Relaxed);
-        // Metrics simplified for compilation
+        self.data
+            .deserialization_errors
+            .fetch_add(1, Ordering::Relaxed);
     }
 
     pub fn increment_dex_detections(&self) {
-        self.dex_detections.fetch_add(1, Ordering::Relaxed);
-        // Metrics simplified for compilation
+        self.data.dex_detections.fetch_add(1, Ordering::Relaxed);
     }
 
     pub fn set_memory_usage(&self, bytes: u64) {
-        self.memory_usage_bytes.store(bytes, Ordering::Relaxed);
-        // Metrics simplified for compilation
+        self.data.memory_usage_bytes.store(bytes, Ordering::Relaxed);
     }
 
     pub fn record_processing_duration(&self, duration: std::time::Duration) {
@@ -78,13 +82,13 @@ impl MempoolMetrics {
 
     pub fn get_stats(&self) -> MempoolStats {
         MempoolStats {
-            transactions_processed: self.transactions_processed.load(Ordering::Relaxed),
-            bytes_received: self.bytes_received.load(Ordering::Relaxed),
-            connection_attempts: self.connection_attempts.load(Ordering::Relaxed),
-            connection_failures: self.connection_failures.load(Ordering::Relaxed),
-            deserialization_errors: self.deserialization_errors.load(Ordering::Relaxed),
-            dex_detections: self.dex_detections.load(Ordering::Relaxed),
-            memory_usage_bytes: self.memory_usage_bytes.load(Ordering::Relaxed),
+            transactions_processed: self.data.transactions_processed.load(Ordering::Relaxed),
+            bytes_received: self.data.bytes_received.load(Ordering::Relaxed),
+            connection_attempts: self.data.connection_attempts.load(Ordering::Relaxed),
+            connection_failures: self.data.connection_failures.load(Ordering::Relaxed),
+            deserialization_errors: self.data.deserialization_errors.load(Ordering::Relaxed),
+            dex_detections: self.data.dex_detections.load(Ordering::Relaxed),
+            memory_usage_bytes: self.data.memory_usage_bytes.load(Ordering::Relaxed),
         }
     }
 }
@@ -127,19 +131,5 @@ impl Drop for ProcessingTimer {
         // Record metrics simplified for compilation
         let _duration_micros = duration.as_micros() as f64;
         let _latency = latency_ms;
-    }
-}
-
-impl Clone for MempoolMetrics {
-    fn clone(&self) -> Self {
-        Self {
-            transactions_processed: AtomicU64::new(self.transactions_processed.load(Ordering::Relaxed)),
-            bytes_received: AtomicU64::new(self.bytes_received.load(Ordering::Relaxed)),
-            connection_attempts: AtomicU64::new(self.connection_attempts.load(Ordering::Relaxed)),
-            connection_failures: AtomicU64::new(self.connection_failures.load(Ordering::Relaxed)),
-            deserialization_errors: AtomicU64::new(self.deserialization_errors.load(Ordering::Relaxed)),
-            dex_detections: AtomicU64::new(self.dex_detections.load(Ordering::Relaxed)),
-            memory_usage_bytes: AtomicU64::new(self.memory_usage_bytes.load(Ordering::Relaxed)),
-        }
     }
 }

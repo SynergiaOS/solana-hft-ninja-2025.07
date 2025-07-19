@@ -1,0 +1,188 @@
+# 🎯 Wzorce refaktoryzacji dla Cerberus Refactor-Kit
+# Gotowe wzorce dla typowych operacji refaktoryzacji
+
+rust_patterns:
+  # Funkcje
+  function_rename:
+    pattern: "fn $OLD_NAME($$$) { $$$ }"
+    rewrite: "fn $NEW_NAME($$$) { $$$ }"
+    description: "Zmiana nazwy funkcji"
+    
+  function_call_rename:
+    pattern: "$OLD_NAME($$$)"
+    rewrite: "$NEW_NAME($$$)"
+    description: "Aktualizacja wywołań funkcji"
+    
+  # Struktury
+  struct_rename:
+    pattern: "struct $OLD_NAME { $$$ }"
+    rewrite: "struct $NEW_NAME { $$$ }"
+    description: "Zmiana nazwy struktury"
+    
+  struct_usage_rename:
+    pattern: "$OLD_NAME::"
+    rewrite: "$NEW_NAME::"
+    description: "Aktualizacja użyć struktury"
+    
+  # Zmienne
+  variable_declaration:
+    pattern: "let $OLD_NAME"
+    rewrite: "let $NEW_NAME"
+    description: "Zmiana nazwy zmiennej w deklaracji"
+    
+  # Moduły
+  module_declaration:
+    pattern: "mod $OLD_NAME"
+    rewrite: "mod $NEW_NAME"
+    description: "Zmiana nazwy modułu"
+    
+  module_import:
+    pattern: "use $$$::$OLD_NAME"
+    rewrite: "use $$$::$NEW_NAME"
+    description: "Aktualizacja importów modułu"
+    
+  # Enums
+  enum_rename:
+    pattern: "enum $OLD_NAME { $$$ }"
+    rewrite: "enum $NEW_NAME { $$$ }"
+    description: "Zmiana nazwy enum"
+    
+  # Traits
+  trait_rename:
+    pattern: "trait $OLD_NAME { $$$ }"
+    rewrite: "trait $NEW_NAME { $$$ }"
+    description: "Zmiana nazwy trait"
+    
+  # Implementacje
+  impl_rename:
+    pattern: "impl $OLD_NAME { $$$ }"
+    rewrite: "impl $NEW_NAME { $$$ }"
+    description: "Aktualizacja implementacji"
+
+python_patterns:
+  # Klasy
+  class_rename:
+    pattern: "class $OLD_NAME:"
+    rewrite: "class $NEW_NAME:"
+    description: "Zmiana nazwy klasy"
+    
+  class_inheritance:
+    pattern: "class $$$($OLD_NAME):"
+    rewrite: "class $$$($NEW_NAME):"
+    description: "Aktualizacja dziedziczenia"
+    
+  # Funkcje
+  function_rename:
+    pattern: "def $OLD_NAME($$$):"
+    rewrite: "def $NEW_NAME($$$):"
+    description: "Zmiana nazwy funkcji"
+    
+  function_call:
+    pattern: "$OLD_NAME($$$)"
+    rewrite: "$NEW_NAME($$$)"
+    description: "Aktualizacja wywołań funkcji"
+    
+  # Zmienne
+  variable_assignment:
+    pattern: "$OLD_NAME ="
+    rewrite: "$NEW_NAME ="
+    description: "Zmiana nazwy zmiennej"
+    
+  # Importy
+  import_rename:
+    pattern: "import $OLD_NAME"
+    rewrite: "import $NEW_NAME"
+    description: "Zmiana nazwy w imporcie"
+    
+  from_import:
+    pattern: "from $$$ import $OLD_NAME"
+    rewrite: "from $$$ import $NEW_NAME"
+    description: "Zmiana nazwy w from import"
+
+config_patterns:
+  # TOML
+  toml_key:
+    pattern: "$OLD_KEY ="
+    rewrite: "$NEW_KEY ="
+    description: "Zmiana klucza w TOML"
+    
+  toml_section:
+    pattern: "[$OLD_SECTION]"
+    rewrite: "[$NEW_SECTION]"
+    description: "Zmiana nazwy sekcji TOML"
+    
+  # YAML
+  yaml_key:
+    pattern: "$OLD_KEY:"
+    rewrite: "$NEW_KEY:"
+    description: "Zmiana klucza w YAML"
+    
+  # JSON
+  json_key:
+    pattern: "\"$OLD_KEY\":"
+    rewrite: "\"$NEW_KEY\":"
+    description: "Zmiana klucza w JSON"
+
+# Specjalne wzorce dla projektu Solana HFT Ninja
+project_specific:
+  # Strategie
+  strategy_rename:
+    pattern: "struct $OLD_NAMEStrategy"
+    rewrite: "struct $NEW_NAMEStrategy"
+    description: "Zmiana nazwy strategii"
+    
+  # Metryki
+  metric_rename:
+    pattern: "metrics::$OLD_NAME"
+    rewrite: "metrics::$NEW_NAME"
+    description: "Zmiana nazwy metryki"
+    
+  # Konfiguracja
+  config_field:
+    pattern: "$OLD_FIELD: $$$"
+    rewrite: "$NEW_FIELD: $$$"
+    description: "Zmiana pola konfiguracji"
+    
+  # API endpoints
+  api_endpoint:
+    pattern: "\"/api/$OLD_ENDPOINT\""
+    rewrite: "\"/api/$NEW_ENDPOINT\""
+    description: "Zmiana endpointu API"
+
+# Wzorce dla Cerebro (Python AI)
+cerebro_patterns:
+  # Agenci
+  agent_class:
+    pattern: "class $OLD_NAMEAgent"
+    rewrite: "class $NEW_NAMEAgent"
+    description: "Zmiana nazwy agenta"
+    
+  # Modele
+  model_class:
+    pattern: "class $OLD_NAMEModel"
+    rewrite: "class $NEW_NAMEModel"
+    description: "Zmiana nazwy modelu"
+    
+  # Serwisy
+  service_class:
+    pattern: "class $OLD_NAMEService"
+    rewrite: "class $NEW_NAMEService"
+    description: "Zmiana nazwy serwisu"
+
+# Wzorce bezpieczeństwa - rzeczy, których NIE należy zmieniać automatycznie
+dangerous_patterns:
+  - "password"
+  - "secret"
+  - "key"
+  - "token"
+  - "hash"
+  - "signature"
+  - "private"
+  - "wallet"
+  - "seed"
+
+# Wzorce do ignorowania w komentarzach i stringach
+ignore_in:
+  - comments
+  - string_literals
+  - documentation

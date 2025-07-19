@@ -1,13 +1,12 @@
 //! OUMI AI Integration for Solana HFT Ninja
-//! 
+//!
 //! Advanced AI framework integration for trading intelligence
 
-use anyhow::{Result, Context};
+use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use std::path::PathBuf;
 use tokio::sync::RwLock;
-use tracing::{info, warn, debug, error};
+use tracing::{debug, info, warn};
 
 /// OUMI AI Configuration
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -22,14 +21,14 @@ pub struct OumiConfig {
     pub fine_tuning_enabled: bool,
     pub training_data_path: String,
     pub model_update_interval_hours: u64,
-    
+
     // Model capabilities
     pub multi_modal: bool,
     pub text_analysis: bool,
     pub price_prediction: bool,
     pub sentiment_analysis: bool,
     pub risk_assessment: bool,
-    
+
     // Performance settings
     pub gpu_acceleration: bool,
     pub quantization: String,
@@ -181,11 +180,11 @@ impl OumiEngine {
     /// Create new OUMI AI engine
     pub fn new(config: OumiConfig) -> Result<Self> {
         info!("🧠 Initializing OUMI AI Engine...");
-        
+
         if !config.enabled {
             warn!("🧠 OUMI AI is disabled in configuration");
         }
-        
+
         Ok(Self {
             config,
             model_cache: RwLock::new(HashMap::new()),
@@ -193,35 +192,37 @@ impl OumiEngine {
             performance_metrics: RwLock::new(PerformanceMetrics::default()),
         })
     }
-    
+
     /// Initialize and load models
     pub async fn initialize(&self) -> Result<()> {
         if !self.config.enabled {
             return Ok(());
         }
-        
+
         info!("🧠 Loading OUMI AI models...");
-        
+
         // Load main trading model
-        self.load_model("trading_main", &self.config.model_path).await?;
-        
+        self.load_model("trading_main", &self.config.model_path)
+            .await?;
+
         // Load specialized models if enabled
         if self.config.sentiment_analysis {
-            self.load_model("sentiment", "models/oumi-sentiment").await?;
+            self.load_model("sentiment", "models/oumi-sentiment")
+                .await?;
         }
-        
+
         if self.config.risk_assessment {
             self.load_model("risk", "models/oumi-risk").await?;
         }
-        
+
         info!("🧠 OUMI AI Engine initialized successfully");
         Ok(())
     }
-    
+
     /// Load a specific model
     async fn load_model(&self, model_id: &str, model_path: &str) -> Result<()> {
         debug!("🧠 Loading model: {} from {}", model_id, model_path);
-        
+
         // Simulate model loading (replace with actual OUMI integration)
         let model_instance = ModelInstance {
             model_id: model_id.to_string(),
@@ -229,103 +230,109 @@ impl OumiEngine {
             inference_count: 0,
             accuracy_score: 0.85, // Initial score
         };
-        
+
         let mut cache = self.model_cache.write().await;
         cache.insert(model_id.to_string(), model_instance);
-        
+
         info!("🧠 Model {} loaded successfully", model_id);
         Ok(())
     }
-    
+
     /// Predict token price movement
-    pub async fn predict_token(&self, token_address: &str, market_data: &MarketData) -> Result<TradingPrediction> {
+    pub async fn predict_token(
+        &self,
+        token_address: &str,
+        market_data: &MarketData,
+    ) -> Result<TradingPrediction> {
         if !self.config.enabled {
             return Err(anyhow::anyhow!("OUMI AI is disabled"));
         }
-        
+
         debug!("🧠 Generating prediction for token: {}", token_address);
-        
+
         // Prepare input data for model
         let input_features = self.prepare_features(token_address, market_data).await?;
-        
+
         // Run inference
         let prediction = self.run_inference("trading_main", &input_features).await?;
-        
+
         // Store prediction
         let mut history = self.prediction_history.write().await;
         history.push(prediction.clone());
-        
+
         // Update metrics
         self.update_metrics().await?;
-        
+
         Ok(prediction)
     }
-    
+
     /// Analyze overall market conditions
     pub async fn analyze_market(&self, market_data: &MarketData) -> Result<MarketAnalysis> {
         if !self.config.enabled {
             return Err(anyhow::anyhow!("OUMI AI is disabled"));
         }
-        
+
         info!("🧠 Analyzing market conditions...");
-        
+
         // Simulate market analysis (replace with actual OUMI integration)
         let analysis = MarketAnalysis {
             overall_sentiment: 0.65, // Slightly bullish
             market_trend: MarketTrend::Bullish,
             volatility_index: 0.45,
             risk_level: RiskLevel::Medium,
-            recommended_actions: vec![
-                RecommendedAction {
-                    action_type: ActionType::Hold,
-                    token_address: None,
-                    confidence: 0.8,
-                    urgency: Urgency::Low,
-                    reasoning: "Market showing stable upward trend".to_string(),
-                }
-            ],
+            recommended_actions: vec![RecommendedAction {
+                action_type: ActionType::Hold,
+                token_address: None,
+                confidence: 0.8,
+                urgency: Urgency::Low,
+                reasoning: "Market showing stable upward trend".to_string(),
+            }],
             key_insights: vec![
                 "Increased whale activity detected".to_string(),
                 "DEX liquidity improving across major pairs".to_string(),
                 "Social sentiment trending positive".to_string(),
             ],
         };
-        
+
         Ok(analysis)
     }
-    
+
     /// Prepare features for model input
-    async fn prepare_features(&self, token_address: &str, market_data: &MarketData) -> Result<Vec<f32>> {
+    async fn prepare_features(
+        &self,
+        token_address: &str,
+        market_data: &MarketData,
+    ) -> Result<Vec<f32>> {
         // Extract and normalize features from market data
         let mut features = Vec::new();
-        
+
         // Price features
         features.push(market_data.current_price as f32);
         features.push(market_data.volume_24h as f32);
         features.push(market_data.price_change_24h as f32);
-        
+
         // Technical indicators
         features.push(market_data.rsi.unwrap_or(50.0) as f32);
         features.push(market_data.macd.unwrap_or(0.0) as f32);
-        
+
         // Liquidity metrics
         features.push(market_data.liquidity_sol as f32);
         features.push(market_data.holder_count as f32);
-        
+
         // Normalize features (simple min-max scaling)
         for feature in &mut features {
             *feature = (*feature).clamp(0.0, 1.0);
         }
-        
+
         Ok(features)
     }
-    
+
     /// Run model inference
     async fn run_inference(&self, model_id: &str, features: &[f32]) -> Result<TradingPrediction> {
         // Simulate model inference (replace with actual OUMI integration)
         let confidence = 0.75 + (features.iter().sum::<f32>() % 0.25);
         let risk_score = 1.0 - confidence;
-        
+
         let prediction = TradingPrediction {
             token_address: "simulated_token".to_string(),
             prediction_type: if confidence > 0.8 {
@@ -339,26 +346,32 @@ impl OumiEngine {
             risk_score: risk_score.into(),
             sentiment_score: 0.6,
             technical_indicators: HashMap::from([
-                ("rsi".to_string(), features.get(3).unwrap_or(&50.0).clone() as f64),
-                ("macd".to_string(), features.get(4).unwrap_or(&0.0).clone() as f64),
+                (
+                    "rsi".to_string(),
+                    features.get(3).unwrap_or(&50.0).clone() as f64,
+                ),
+                (
+                    "macd".to_string(),
+                    features.get(4).unwrap_or(&0.0).clone() as f64,
+                ),
             ]),
             reasoning: "AI model detected bullish pattern with high confidence".to_string(),
         };
-        
+
         Ok(prediction)
     }
-    
+
     /// Update performance metrics
     async fn update_metrics(&self) -> Result<()> {
         let mut metrics = self.performance_metrics.write().await;
         metrics.total_predictions += 1;
-        
+
         // Update other metrics based on actual performance
         // This would be implemented with real feedback data
-        
+
         Ok(())
     }
-    
+
     /// Get model performance statistics
     pub async fn get_performance_stats(&self) -> PerformanceMetrics {
         self.performance_metrics.read().await.clone()

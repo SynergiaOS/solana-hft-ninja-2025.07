@@ -1,14 +1,14 @@
 //! API Module
-//! 
+//!
 //! REST API endpoints for HFT system control and monitoring
 
 // 🥷 API Layer - High-Performance REST & WebSocket API
 // Unified API for trading engine control and monitoring
 
-pub mod strategy_control;
 pub mod rest;
-pub mod websocket;
+pub mod strategy_control;
 pub mod types;
+pub mod websocket;
 
 use crate::core::Engine;
 use anyhow::Result;

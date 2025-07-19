@@ -1,14 +1,14 @@
 //! Webhook Client for HFT Ninja → Cerebro Communication
-//! 
+//!
 //! Sends real-time events from Rust HFT engine to Python Cerebro AI
 
-use anyhow::{Result, Context};
+use anyhow::{Context, Result};
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::time::{SystemTime, UNIX_EPOCH};
 use tokio::sync::RwLock;
-use tracing::{info, warn, debug, error};
+use tracing::{debug, info, warn};
 
 /// Webhook client configuration
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -137,32 +137,44 @@ impl WebhookClient {
 
     /// Send MEV opportunity event
     pub async fn send_opportunity(&self, event: OpportunityEvent) -> Result<()> {
-        debug!("🎯 Sending opportunity event: {} for {}", event.opportunity_type, event.token_address);
-        
+        debug!(
+            "🎯 Sending opportunity event: {} for {}",
+            event.opportunity_type, event.token_address
+        );
+
         let webhook_event = WebhookEvent::Opportunity(event);
         self.send_event(webhook_event).await
     }
 
     /// Send trade execution event
     pub async fn send_execution(&self, event: ExecutionEvent) -> Result<()> {
-        info!("📊 Sending execution event: {} - {} SOL", event.outcome, event.pnl_sol);
-        
+        info!(
+            "📊 Sending execution event: {} - {} SOL",
+            event.outcome, event.pnl_sol
+        );
+
         let webhook_event = WebhookEvent::Execution(event);
         self.send_event(webhook_event).await
     }
 
     /// Send risk management event
     pub async fn send_risk(&self, event: RiskEvent) -> Result<()> {
-        warn!("⚠️ Sending risk event: {} - {}", event.risk_type, event.severity);
-        
+        warn!(
+            "⚠️ Sending risk event: {} - {}",
+            event.risk_type, event.severity
+        );
+
         let webhook_event = WebhookEvent::Risk(event);
         self.send_event(webhook_event).await
     }
 
     /// Send wallet tracking event
     pub async fn send_wallet(&self, event: WalletEvent) -> Result<()> {
-        debug!("👛 Sending wallet event: {} from {}", event.event_subtype, event.wallet_address);
-        
+        debug!(
+            "👛 Sending wallet event: {} from {}",
+            event.event_subtype, event.wallet_address
+        );
+
         let webhook_event = WebhookEvent::Wallet(event);
         self.send_event(webhook_event).await
     }
@@ -170,7 +182,7 @@ impl WebhookClient {
     /// Send event with retry logic
     async fn send_event(&self, event: WebhookEvent) -> Result<()> {
         let start_time = SystemTime::now();
-        
+
         for attempt in 1..=self.config.retry_attempts {
             match self.send_event_once(&event).await {
                 Ok(_) => {
@@ -187,8 +199,9 @@ impl WebhookClient {
                         // Retry with delay
                         warn!("🔄 Webhook attempt {} failed, retrying: {}", attempt, e);
                         tokio::time::sleep(std::time::Duration::from_millis(
-                            self.config.retry_delay_ms * attempt as u64
-                        )).await;
+                            self.config.retry_delay_ms * attempt as u64,
+                        ))
+                        .await;
                     }
                 }
             }
@@ -207,8 +220,9 @@ impl WebhookClient {
         };
 
         let url = format!("{}{}", self.config.cerebro_bff_url, endpoint);
-        
-        let response = self.client
+
+        let response = self
+            .client
             .post(&url)
             .json(&payload)
             .send()
@@ -221,7 +235,11 @@ impl WebhookClient {
         } else {
             let status = response.status();
             let error_text = response.text().await.unwrap_or_default();
-            Err(anyhow::anyhow!("Webhook failed with status {}: {}", status, error_text))
+            Err(anyhow::anyhow!(
+                "Webhook failed with status {}: {}",
+                status,
+                error_text
+            ))
         }
     }
 
@@ -229,16 +247,19 @@ impl WebhookClient {
     async fn update_success_stats(&self, start_time: SystemTime) {
         let mut stats = self.stats.write().await;
         stats.events_sent += 1;
-        
+
         if let Ok(duration) = start_time.elapsed() {
             let latency_ms = duration.as_millis() as f64;
-            stats.average_latency_ms = 
-                (stats.average_latency_ms * (stats.events_sent - 1) as f64 + latency_ms) 
+            stats.average_latency_ms = (stats.average_latency_ms * (stats.events_sent - 1) as f64
+                + latency_ms)
                 / stats.events_sent as f64;
         }
-        
+
         stats.last_success = Some(
-            SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs()
+            SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap()
+                .as_secs(),
         );
     }
 
@@ -247,7 +268,10 @@ impl WebhookClient {
         let mut stats = self.stats.write().await;
         stats.events_failed += 1;
         stats.last_failure = Some(
-            SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs()
+            SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap()
+                .as_secs(),
         );
     }
 
@@ -277,7 +301,10 @@ impl WebhookClient {
             risk_score,
             trigger_wallet: trigger_wallet.map(|s| s.to_string()),
             dex_involved: dex_involved.to_string(),
-            timestamp: SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs_f64(),
+            timestamp: SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap()
+                .as_secs_f64(),
             metadata,
         }
     }
@@ -305,7 +332,10 @@ impl WebhookClient {
             execution_time_ms,
             gas_used,
             trigger_wallet: trigger_wallet.map(|s| s.to_string()),
-            timestamp: SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs_f64(),
+            timestamp: SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap()
+                .as_secs_f64(),
             metadata,
         }
     }
@@ -327,7 +357,10 @@ impl WebhookClient {
             description: description.to_string(),
             affected_strategies,
             action_taken: action_taken.to_string(),
-            timestamp: SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs_f64(),
+            timestamp: SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap()
+                .as_secs_f64(),
             metadata,
         }
     }
@@ -349,7 +382,10 @@ impl WebhookClient {
             token_address: token_address.map(|s| s.to_string()),
             amount_sol,
             confidence,
-            timestamp: SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs_f64(),
+            timestamp: SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap()
+                .as_secs_f64(),
             metadata,
         }
     }
@@ -365,7 +401,8 @@ impl WebhookClient {
             HashMap::new(),
         );
 
-        self.send_risk(test_event).await
+        self.send_risk(test_event)
+            .await
             .context("Webhook connection test failed")
     }
 }

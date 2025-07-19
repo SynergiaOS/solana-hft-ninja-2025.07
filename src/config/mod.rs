@@ -1,7 +1,6 @@
-use serde::{Deserialize, Serialize};
-use std::path::Path;
+use crate::ai::{AIConfig, LMCacheConfig, OpenSearchConfig, OumiConfig};
 use crate::strategies::wallet_tracker::WalletTrackerConfig;
-use crate::ai::{AIConfig, OumiConfig, OpenSearchConfig, LMCacheConfig, IntegrationConfig};
+use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Config {
@@ -75,10 +74,10 @@ pub struct MonitoringConfig {
 impl Default for RiskConfig {
     fn default() -> Self {
         Self {
-            stop_loss_bps: 200,      // 2%
-            take_profit_bps: 300,    // 3%
-            max_drawdown_bps: 500,   // 5%
-            risk_limit_bps: 1000,    // 10% max position size
+            stop_loss_bps: 200,    // 2%
+            take_profit_bps: 300,  // 3%
+            max_drawdown_bps: 500, // 5%
+            risk_limit_bps: 1000,  // 10% max position size
         }
     }
 }
@@ -89,7 +88,7 @@ impl Config {
             .add_source(
                 config::File::with_name(config_path)
                     .format(config::FileFormat::Toml)
-                    .required(true)
+                    .required(true),
             )
             .add_source(config::Environment::with_prefix("SOLANA_HFT"))
             .build()?;

@@ -1,7 +1,7 @@
+use anyhow::{Context, Result};
 use solana_sdk::{signature::Keypair, signer::Signer};
-use std::sync::Arc;
-use anyhow::{Result, Context};
 use std::fs;
+use std::sync::Arc;
 
 #[derive(Clone)]
 pub struct WalletManager {
@@ -25,8 +25,8 @@ impl WalletManager {
             .with_context(|| format!("Failed to parse wallet file as JSON: {}", path))?;
 
         // Create keypair from bytes
-        let keypair = Keypair::from_bytes(&bytes)
-            .with_context(|| "Failed to create keypair from bytes")?;
+        let keypair =
+            Keypair::from_bytes(&bytes).with_context(|| "Failed to create keypair from bytes")?;
 
         Ok(Self::new(keypair))
     }
@@ -58,8 +58,8 @@ impl Wallet {
         let bytes: Vec<u8> = serde_json::from_str(&keypair_data)
             .with_context(|| format!("Failed to parse wallet file as JSON: {}", path))?;
 
-        let keypair = Keypair::from_bytes(&bytes)
-            .with_context(|| "Failed to create keypair from bytes")?;
+        let keypair =
+            Keypair::from_bytes(&bytes).with_context(|| "Failed to create keypair from bytes")?;
 
         Ok(Self {
             keypair: Arc::new(keypair),

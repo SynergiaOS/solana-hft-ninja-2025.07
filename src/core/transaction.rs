@@ -1,10 +1,6 @@
 use solana_sdk::{
-    instruction::Instruction,
-    message::Message,
-    transaction::Transaction,
-    pubkey::Pubkey,
+    instruction::Instruction, message::Message, pubkey::Pubkey, transaction::Transaction,
 };
-use anyhow::Result;
 
 pub struct TransactionBuilder {
     payer: Pubkey,

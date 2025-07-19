@@ -1,12 +1,11 @@
 //! MEV (Maximal Extractable Value) Strategies
-//! 
+//!
 //! Advanced MEV detection and execution strategies for Solana
 
-use anyhow::{Result, Context};
+use crate::mempool::dex_detector::{DexProtocol, DexTransaction, DexTransactionType};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use tracing::{info, warn, debug};
-use crate::mempool::dex_detector::{DexTransaction, DexTransactionType, DexProtocol};
+use tracing::debug;
 
 /// MEV opportunity types
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -87,10 +86,10 @@ impl Default for MevConfig {
             sandwich_enabled: true,
             arbitrage_enabled: true,
             liquidation_enabled: true,
-            token_launch_enabled: false, // Risky, disabled by default
-            min_profit_threshold: 10000, // 0.01 SOL
+            token_launch_enabled: false,   // Risky, disabled by default
+            min_profit_threshold: 10000,   // 0.01 SOL
             max_position_size: 1000000000, // 1 SOL
-            max_slippage_bps: 300, // 3%
+            max_slippage_bps: 300,         // 3%
             priority_fee_multiplier: 2.0,
         }
     }
@@ -122,62 +121,70 @@ impl MevEngine {
             config,
         }
     }
-    
+
     /// Analyze DEX transaction for MEV opportunities
     pub fn analyze_transaction(&mut self, dex_tx: &DexTransaction) -> Vec<MevOpportunity> {
         let mut opportunities = Vec::new();
-        
+
         // Sandwich attack detection
         if self.config.sandwich_enabled {
             if let Some(sandwich) = self.detect_sandwich_opportunity(dex_tx) {
                 opportunities.push(sandwich);
             }
         }
-        
+
         // Arbitrage detection
         if self.config.arbitrage_enabled {
             if let Some(arbitrage) = self.detect_arbitrage_opportunity(dex_tx) {
                 opportunities.push(arbitrage);
             }
         }
-        
+
         // Token launch detection
         if self.config.token_launch_enabled {
             if let Some(launch) = self.detect_token_launch(dex_tx) {
                 opportunities.push(launch);
             }
         }
-        
+
         // Store opportunities for analysis
         self.execution_stats.total_opportunities += opportunities.len() as u64;
-        
+
         opportunities
     }
-    
+
     /// Detect sandwich attack opportunity
     fn detect_sandwich_opportunity(&self, dex_tx: &DexTransaction) -> Option<MevOpportunity> {
         match &dex_tx.transaction_type {
-            DexTransactionType::Swap { amount_in, amount_out, token_in, token_out, slippage_bps } => {
+            DexTransactionType::Swap {
+                amount_in,
+                amount_out,
+                token_in,
+                token_out,
+                slippage_bps,
+            } => {
                 // Only sandwich large swaps with high slippage
-                if *amount_in < 100000000 { // Less than 0.1 SOL
+                if *amount_in < 100000000 {
+                    // Less than 0.1 SOL
                     return None;
                 }
-                
+
                 let slippage = slippage_bps.unwrap_or(100);
-                if slippage < 50 { // Less than 0.5% slippage
+                if slippage < 50 {
+                    // Less than 0.5% slippage
                     return None;
                 }
-                
+
                 // Calculate sandwich parameters
                 let front_run_amount = amount_in / 10; // 10% of victim's trade
                 let back_run_amount = front_run_amount + (front_run_amount * slippage / 10000);
                 let estimated_profit = (front_run_amount * slippage) / 10000;
-                
+
                 // Check profitability
                 if estimated_profit < self.config.min_profit_threshold {
                     return None;
                 }
-                
+
                 Some(MevOpportunity::Sandwich {
                     victim_tx: dex_tx.clone(),
                     front_run_amount,
@@ -189,26 +196,30 @@ impl MevEngine {
             _ => None,
         }
     }
-    
+
     /// Detect arbitrage opportunity
     fn detect_arbitrage_opportunity(&self, dex_tx: &DexTransaction) -> Option<MevOpportunity> {
         match &dex_tx.transaction_type {
-            DexTransactionType::Swap { token_in, token_out, .. } => {
+            DexTransactionType::Swap {
+                token_in,
+                token_out,
+                ..
+            } => {
                 let token_pair = format!("{}/{}", token_in, token_out);
-                
+
                 // Simulate price check across different DEXs
                 let current_price = self.get_token_price(&token_pair);
                 let other_dex_price = self.simulate_other_dex_price(&dex_tx.protocol, &token_pair);
-                
+
                 if let (Some(price1), Some(price2)) = (current_price, other_dex_price) {
                     let price_diff = if price1 > price2 {
                         price1 - price2
                     } else {
                         price2 - price1
                     };
-                    
+
                     let profit_bps = (price_diff * 10000) / price1.min(price2);
-                    
+
                     // Minimum 0.5% profit required
                     if profit_bps >= 50 {
                         let (buy_dex, sell_dex, buy_price, sell_price) = if price1 < price2 {
@@ -216,7 +227,7 @@ impl MevEngine {
                         } else {
                             (DexProtocol::Orca, dex_tx.protocol.clone(), price2, price1)
                         };
-                        
+
                         return Some(MevOpportunity::Arbitrage {
                             token_pair,
                             buy_dex,
@@ -228,30 +239,34 @@ impl MevEngine {
                         });
                     }
                 }
-                
+
                 None
             }
             _ => None,
         }
     }
-    
+
     /// Detect token launch opportunity
     fn detect_token_launch(&self, dex_tx: &DexTransaction) -> Option<MevOpportunity> {
         match &dex_tx.transaction_type {
-            DexTransactionType::CreatePool { token_a, token_b, initial_price } => {
+            DexTransactionType::CreatePool {
+                token_a,
+                token_b,
+                initial_price,
+            } => {
                 // Check if this is a new token launch
-                if token_a == "So11111111111111111111111111111111111111112" || 
-                   token_b == "So11111111111111111111111111111111111111112" {
-                    
+                if token_a == "So11111111111111111111111111111111111111112"
+                    || token_b == "So11111111111111111111111111111111111111112"
+                {
                     let token_mint = if token_a != "So11111111111111111111111111111111111111112" {
                         token_a.clone()
                     } else {
                         token_b.clone()
                     };
-                    
+
                     // Estimate initial liquidity (simplified)
                     let initial_liquidity = 1000000000; // 1 SOL equivalent
-                    
+
                     Some(MevOpportunity::TokenLaunch {
                         token_mint,
                         pool_address: "pool_address".to_string(), // Would be extracted
@@ -266,38 +281,38 @@ impl MevEngine {
             _ => None,
         }
     }
-    
+
     /// Get cached token price
     fn get_token_price(&self, token_pair: &str) -> Option<u64> {
         // Mock implementation - would use real price feeds
         Some(1000000) // 1 SOL in lamports
     }
-    
+
     /// Simulate price on other DEX (mock implementation)
     fn simulate_other_dex_price(&self, current_dex: &DexProtocol, token_pair: &str) -> Option<u64> {
         // Mock implementation - in reality would query other DEXs
         let base_price = self.get_token_price(token_pair).unwrap_or(1000000);
-        
+
         // Simulate price differences between DEXs
         match current_dex {
             DexProtocol::Raydium => Some(base_price + (base_price / 200)), // +0.5%
-            DexProtocol::Orca => Some(base_price - (base_price / 300)), // -0.33%
+            DexProtocol::Orca => Some(base_price - (base_price / 300)),    // -0.33%
             DexProtocol::Jupiter => Some(base_price + (base_price / 400)), // +0.25%
             _ => Some(base_price),
         }
     }
-    
+
     /// Update token price in cache
     pub fn update_price(&mut self, token_pair: String, price: u64) {
         // Would update real price cache
         debug!("Price updated for {}: {}", token_pair, price);
     }
-    
+
     /// Get MEV statistics
     pub fn get_stats(&self) -> MevStats {
         MevStats {
             total_opportunities: self.execution_stats.total_opportunities as usize,
-            sandwich_count: 0, // Would track from execution_stats
+            sandwich_count: 0,  // Would track from execution_stats
             arbitrage_count: 0, // Would track from execution_stats
             liquidation_count: 0,
             token_launch_count: 0,
@@ -396,6 +411,7 @@ impl MevExecutionStats {
 /// MEV risk manager
 #[derive(Debug, Clone)]
 pub struct MevRiskManager {
+    #[allow(dead_code)]
     config: MevConfig,
 }
 

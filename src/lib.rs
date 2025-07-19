@@ -1,32 +1,32 @@
+pub mod ai;
 pub mod api;
+pub mod bridge;
+pub mod cerebro;
 pub mod config;
 pub mod core;
+pub mod engine;
+pub mod execution;
 pub mod market;
 pub mod mempool;
-pub mod network;
-pub mod strategy;
-pub mod strategies;
-pub mod execution;
 pub mod monitoring;
+pub mod network;
+pub mod security;
+pub mod simple_engine;
+pub mod strategies;
+pub mod strategy;
 pub mod types;
 pub mod utils;
-pub mod bridge;
-pub mod simple_engine;
-pub mod security;
-pub mod engine;
-pub mod ai;
-pub mod cerebro;
 
-pub use config::Config;
-pub use bridge::*;
-pub use simple_engine::*;
-pub use mempool::*;
-pub use network::*;
-pub use strategy::*;
-pub use strategies::*;
-pub use execution::*;
-pub use monitoring::*;
-pub use engine::*;
-pub use types::*;
 pub use ai::*;
+pub use bridge::*;
 pub use cerebro::*;
+pub use config::Config;
+pub use engine::Engine; // Specific exports to avoid conflicts
+pub use execution::*;
+pub use mempool::*;
+pub use monitoring::*; // Keep all monitoring exports
+pub use network::*;
+pub use simple_engine::*;
+pub use strategies::{Backtester, BacktestConfig, BacktestResults}; // Specific exports to avoid conflicts
+pub use strategy::Strategy; // Specific exports to avoid conflicts
+pub use types::*;

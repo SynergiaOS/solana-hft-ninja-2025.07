@@ -6,15 +6,15 @@ use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use tokio::sync::RwLock;
-use tracing::{info, warn, error, debug};
+use tracing::{debug, error, info, warn};
 
 use super::{SecurityConfig, TransactionResult};
 
 /// Circuit breaker states
 #[derive(Debug, Clone, PartialEq)]
 pub enum CircuitBreakerState {
-    Closed,  // Normal operation
-    Open,    // Trading halted
+    Closed,   // Normal operation
+    Open,     // Trading halted
     HalfOpen, // Testing if system recovered
 }
 
@@ -41,7 +41,7 @@ impl CircuitBreaker {
     /// Create new circuit breaker
     pub fn new(config: &SecurityConfig) -> Result<Self> {
         info!("🔌 Initializing Circuit Breaker...");
-        
+
         let state = Arc::new(RwLock::new(CircuitBreakerData {
             state: CircuitBreakerState::Closed,
             consecutive_failures: 0,
@@ -52,25 +52,25 @@ impl CircuitBreaker {
             auto_recovery_enabled: true,
             recovery_timeout_seconds: 300, // 5 minutes
         }));
-        
+
         info!("✅ Circuit Breaker initialized");
-        
+
         Ok(Self {
             config: config.clone(),
             state,
         })
     }
-    
+
     /// Check if circuit breaker is open (trading halted)
     pub fn is_open(&self) -> bool {
         // Simplified sync check - in production use async version
         false // Placeholder
     }
-    
+
     /// Update circuit breaker with transaction result
     pub async fn update_with_result(&mut self, result: &TransactionResult) -> Result<()> {
         let mut data = self.state.write().await;
-        
+
         if result.success && result.profit_loss_sol >= 0.0 {
             // Successful trade
             self.handle_success(&mut data).await?;
@@ -78,15 +78,15 @@ impl CircuitBreaker {
             // Failed trade or loss
             self.handle_failure(&mut data, result).await?;
         }
-        
+
         Ok(())
     }
-    
+
     /// Handle successful transaction
     async fn handle_success(&self, data: &mut CircuitBreakerData) -> Result<()> {
         data.consecutive_failures = 0;
         data.last_success_time = Some(std::time::SystemTime::now());
-        
+
         match data.state {
             CircuitBreakerState::HalfOpen => {
                 // Recovery successful - close circuit breaker
@@ -102,42 +102,53 @@ impl CircuitBreaker {
                 warn!("⚠️ Successful transaction while circuit breaker is open");
             }
         }
-        
+
         Ok(())
     }
-    
+
     /// Handle failed transaction
-    async fn handle_failure(&self, data: &mut CircuitBreakerData, result: &TransactionResult) -> Result<()> {
+    async fn handle_failure(
+        &self,
+        data: &mut CircuitBreakerData,
+        result: &TransactionResult,
+    ) -> Result<()> {
         data.consecutive_failures += 1;
         data.total_failures += 1;
         data.last_failure_time = Some(std::time::SystemTime::now());
-        
+
         let threshold = self.config.circuit_breaker_threshold;
-        
+
         match data.state {
             CircuitBreakerState::Closed => {
                 if data.consecutive_failures >= threshold {
                     // Open circuit breaker
                     data.state = CircuitBreakerState::Open;
-                    error!("🚨 Circuit breaker OPENED - {} consecutive failures", data.consecutive_failures);
-                    
+                    error!(
+                        "🚨 Circuit breaker OPENED - {} consecutive failures",
+                        data.consecutive_failures
+                    );
+
                     // Schedule auto-recovery if enabled
                     if data.auto_recovery_enabled {
-                        self.schedule_recovery_attempt(data.recovery_timeout_seconds).await?;
+                        self.schedule_recovery_attempt(data.recovery_timeout_seconds)
+                            .await?;
                     }
                 } else {
-                    warn!("⚠️ Failure {}/{} - circuit breaker remains closed", 
-                          data.consecutive_failures, threshold);
+                    warn!(
+                        "⚠️ Failure {}/{} - circuit breaker remains closed",
+                        data.consecutive_failures, threshold
+                    );
                 }
             }
             CircuitBreakerState::HalfOpen => {
                 // Failed during recovery - back to open
                 data.state = CircuitBreakerState::Open;
                 error!("🚨 Recovery failed - circuit breaker back to OPEN");
-                
+
                 // Schedule another recovery attempt
                 if data.auto_recovery_enabled {
-                    self.schedule_recovery_attempt(data.recovery_timeout_seconds * 2).await?;
+                    self.schedule_recovery_attempt(data.recovery_timeout_seconds * 2)
+                        .await?;
                 }
             }
             CircuitBreakerState::Open => {
@@ -145,69 +156,73 @@ impl CircuitBreaker {
                 debug!("Circuit breaker already open - ignoring failure");
             }
         }
-        
+
         Ok(())
     }
-    
+
     /// Emergency open circuit breaker
     pub async fn emergency_open(&mut self, reason: &str) -> Result<()> {
         let mut data = self.state.write().await;
-        
+
         data.state = CircuitBreakerState::Open;
         data.emergency_reason = Some(reason.to_string());
         data.auto_recovery_enabled = false; // Disable auto-recovery for emergency
-        
+
         error!("🚨 EMERGENCY CIRCUIT BREAKER ACTIVATION: {}", reason);
-        
+
         Ok(())
     }
-    
+
     /// Manually close circuit breaker
     pub async fn manual_close(&mut self) -> Result<()> {
         let mut data = self.state.write().await;
-        
+
         data.state = CircuitBreakerState::Closed;
         data.consecutive_failures = 0;
         data.emergency_reason = None;
         data.auto_recovery_enabled = true;
-        
+
         info!("🔧 Circuit breaker manually CLOSED");
-        
+
         Ok(())
     }
-    
+
     /// Attempt recovery (half-open state)
     pub async fn attempt_recovery(&mut self) -> Result<()> {
         let mut data = self.state.write().await;
-        
+
         if data.state == CircuitBreakerState::Open {
             data.state = CircuitBreakerState::HalfOpen;
             info!("🔄 Circuit breaker HALF-OPEN - testing recovery");
         }
-        
+
         Ok(())
     }
-    
+
     /// Schedule automatic recovery attempt
     async fn schedule_recovery_attempt(&self, delay_seconds: u64) -> Result<()> {
-        info!("⏰ Scheduling recovery attempt in {} seconds", delay_seconds);
-        
+        info!(
+            "⏰ Scheduling recovery attempt in {} seconds",
+            delay_seconds
+        );
+
         // In a real implementation, this would use a proper scheduler
         // For now, just log the intent
         debug!("Recovery scheduled (implementation needed)");
-        
+
         Ok(())
     }
-    
+
     /// Get circuit breaker status
     pub async fn get_status(&self) -> CircuitBreakerStatus {
         let data = self.state.read().await;
-        
-        let uptime_seconds = data.last_success_time
+
+        let uptime_seconds = data
+            .last_success_time
             .and_then(|t| t.elapsed().ok())
             .map(|d| d.as_secs())
             .unwrap_or(0);
-        
+
         let downtime_seconds = if data.state == CircuitBreakerState::Open {
             data.last_failure_time
                 .and_then(|t| t.elapsed().ok())
@@ -216,7 +231,7 @@ impl CircuitBreaker {
         } else {
             0
         };
-        
+
         CircuitBreakerStatus {
             state: data.state.clone(),
             consecutive_failures: data.consecutive_failures,

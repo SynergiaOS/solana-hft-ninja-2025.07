@@ -1,9 +1,15 @@
 use anyhow::Result;
 use clap::Parser;
-use solana_hft_ninja::{config::Config, engine::Engine, mempool::*, mempool::listener::{HeliusConfig, CommitmentLevel}};
-use tokio::sync::mpsc;
-use tracing::{info, error, warn};
+use solana_hft_ninja::{
+    config::Config,
+    engine::Engine,
+    mempool::listener::{CommitmentLevel, HeliusConfig},
+    mempool::*,
+    monitoring::{HftMetrics, MetricsServer},
+};
 use std::sync::Arc;
+use tokio::sync::mpsc;
+use tracing::{error, info, warn};
 
 #[derive(Parser)]
 #[command(name = "hft-ninja")]
@@ -11,10 +17,10 @@ use std::sync::Arc;
 struct Args {
     #[arg(short, long, default_value = "./config")]
     config_path: String,
-    
+
     #[arg(short, long)]
     dry_run: bool,
-    
+
     #[arg(long)]
     enable_mempool: bool,
 }
@@ -23,11 +29,11 @@ struct Args {
 async fn main() -> Result<()> {
     // Initialize tracing
     tracing_subscriber::fmt::init();
-    
+
     let args = Args::parse();
-    
+
     info!("Starting Solana HFT Ninja 2025.07...");
-    
+
     // Load configuration
     let config = Config::load(&args.config_path)?;
 
@@ -58,7 +64,7 @@ async fn main() -> Result<()> {
     if let Some(handle) = mempool_handle {
         handle.await?;
     }
-    
+
     Ok(())
 }
 
@@ -81,15 +87,26 @@ async fn start_enhanced_mempool_listener() -> Result<tokio::task::JoinHandle<()>
         HeliusConfig::default()
     };
 
-    // Create metrics and parser
-    let metrics = MempoolMetrics::new();
-    let parser = ZeroCopyParser::new(metrics.clone(), 16 * 1024 * 1024);
+    // Create HFT metrics and start metrics server
+    let hft_metrics = Arc::new(HftMetrics::new()?);
+    let metrics_server = MetricsServer::new(hft_metrics.clone(), 9464);
+
+    // Start metrics server in background
+    let metrics_handle = tokio::spawn(async move {
+        if let Err(e) = metrics_server.start().await {
+            error!("Failed to start metrics server: {}", e);
+        }
+    });
+
+    // Create mempool metrics and parser
+    let mempool_metrics = MempoolMetrics::new();
+    let parser = ZeroCopyParser::new(mempool_metrics.clone(), 16 * 1024 * 1024);
 
     // Create opportunity detector
     let opportunity_detector = OpportunityDetector::new();
 
     // Create listener
-    let listener = MempoolListener::new(config, parser, metrics, tx);
+    let listener = MempoolListener::new(config, parser, mempool_metrics, tx);
 
     // Start MEV processing task
     let processing_handle = tokio::spawn(async move {

@@ -1,9 +1,9 @@
-pub mod math;
-pub mod logging;
-pub mod metrics;
 pub mod config;
+pub mod logging;
+pub mod math;
+pub mod metrics;
 
-pub use math::MathUtils;
-pub use logging::setup_logging;
-pub use metrics::MetricsCollector;
 pub use config::Config;
+pub use logging::setup_logging;
+pub use math::MathUtils;
+pub use metrics::MetricsCollector;

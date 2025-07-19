@@ -23,6 +23,12 @@ from .tools.fingpt_tool import (
     FinGPTAnalysisTool,
     FinGPTMarketInsightTool
 )
+from .tools.gradio_external_tools import (
+    create_gradio_tools,
+    GradioTokenRiskAnalyzer,
+    GradioSentimentAnalyzer,
+    GradioMarketAnalyzer
+)
 from .human_in_the_loop import (
     HumanInTheLoopManager,
     TradingDecision,

@@ -1,9 +1,18 @@
-apiVersion: 1
+# 🥷 Solana HFT Ninja 2025.07 - Grafana Datasource Configuration
+# Konfiguracja połączenia z Prometheus dla metryk HFT
 
-datasources:
-  - name: Prometheus
-    type: prometheus
-    access: proxy
-    url: http://prometheus:9090
-    isDefault: true
+name: Prometheus
+type: prometheus
+access: proxy
+url: http://prometheus:9090
+isDefault: true
+editable: true
+jsonData:
+  httpMethod: POST
+  queryTimeout: 60s
+  timeInterval: 5s
+  # Optymalizacje dla HFT metryk - wysokie limity dla dużej ilości metryk
+  customQueryParameters: 'max_samples=50000000'
+secureJsonData: {}
+version: 1
     editable: true

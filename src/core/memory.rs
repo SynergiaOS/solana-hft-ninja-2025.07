@@ -1,11 +1,11 @@
 // 🥷 Memory Management - Zero-Copy, High-Performance Memory Pool
 // Optimized memory allocation for sub-microsecond trading operations
 
-use anyhow::{Result, anyhow};
-use std::sync::{Arc, Mutex};
+use anyhow::{anyhow, Result};
+use std::alloc::{alloc, dealloc, Layout};
 use std::collections::VecDeque;
 use std::ptr::NonNull;
-use std::alloc::{Layout, alloc, dealloc};
+use std::sync::{Arc, Mutex};
 
 /// High-performance memory pool for zero-copy operations
 pub struct MemoryPool {
@@ -17,21 +17,21 @@ pub struct MemoryPool {
 impl MemoryPool {
     pub fn new(total_size: usize) -> Result<Self> {
         let mut pools = Vec::new();
-        
+
         // Create pools for different object sizes
         // Optimized for common trading data structures
-        pools.push(ObjectPool::new(64, 1000)?);    // Small objects (prices, timestamps)
-        pools.push(ObjectPool::new(256, 500)?);    // Medium objects (order book entries)
-        pools.push(ObjectPool::new(1024, 100)?);   // Large objects (full order books)
-        pools.push(ObjectPool::new(4096, 50)?);    // Extra large objects (market snapshots)
-        
+        pools.push(ObjectPool::new(64, 1000)?); // Small objects (prices, timestamps)
+        pools.push(ObjectPool::new(256, 500)?); // Medium objects (order book entries)
+        pools.push(ObjectPool::new(1024, 100)?); // Large objects (full order books)
+        pools.push(ObjectPool::new(4096, 50)?); // Extra large objects (market snapshots)
+
         Ok(Self {
             pools,
             total_size,
             used_size: Arc::new(Mutex::new(0)),
         })
     }
-    
+
     /// Allocate memory from the appropriate pool
     pub fn allocate(&self, size: usize) -> Result<PooledMemory> {
         // Find the smallest pool that can accommodate the request
@@ -42,7 +42,7 @@ impl MemoryPool {
                     if let Ok(mut used) = self.used_size.lock() {
                         *used += size;
                     }
-                    
+
                     return Ok(PooledMemory {
                         ptr: memory,
                         size,
@@ -52,17 +52,17 @@ impl MemoryPool {
                 }
             }
         }
-        
+
         Err(anyhow!("No available memory pool for size {}", size))
     }
-    
+
     /// Deallocate memory back to the pool
     pub fn deallocate(&self, memory: PooledMemory) {
         // Find the appropriate pool and return the memory
         for pool in &self.pools {
             if pool.id == memory.pool_id {
                 pool.deallocate(memory.ptr);
-                
+
                 // Update used size
                 if let Ok(mut used) = self.used_size.lock() {
                     *used = used.saturating_sub(memory.size);
@@ -71,15 +71,16 @@ impl MemoryPool {
             }
         }
     }
-    
+
     /// Get memory usage statistics
     pub fn stats(&self) -> MemoryStats {
-        let used_size = self.used_size.lock().unwrap_or_else(|_| {
-            panic!("Mutex poisoned")
-        });
-        
+        let used_size = self
+            .used_size
+            .lock()
+            .unwrap_or_else(|_| panic!("Mutex poisoned"));
+
         let pool_stats: Vec<PoolStats> = self.pools.iter().map(|pool| pool.stats()).collect();
-        
+
         MemoryStats {
             total_size: self.total_size,
             used_size: *used_size,
@@ -101,22 +102,20 @@ pub struct ObjectPool {
 impl ObjectPool {
     fn new(object_size: usize, capacity: usize) -> Result<Self> {
         let mut free_objects = VecDeque::with_capacity(capacity);
-        
+
         // Pre-allocate all objects
         for _ in 0..capacity {
             let layout = Layout::from_size_align(object_size, 8)
                 .map_err(|e| anyhow!("Invalid layout: {}", e))?;
-            
+
             let ptr = unsafe { alloc(layout) };
             if ptr.is_null() {
                 return Err(anyhow!("Failed to allocate memory"));
             }
-            
-            free_objects.push_back(
-                NonNull::new(ptr).ok_or_else(|| anyhow!("Null pointer"))?
-            );
+
+            free_objects.push_back(NonNull::new(ptr).ok_or_else(|| anyhow!("Null pointer"))?);
         }
-        
+
         Ok(Self {
             id: rand::random(),
             object_size,
@@ -125,11 +124,11 @@ impl ObjectPool {
             allocated_count: Mutex::new(0),
         })
     }
-    
+
     fn allocate(&self) -> Option<NonNull<u8>> {
         let mut free_objects = self.free_objects.lock().ok()?;
         let mut allocated_count = self.allocated_count.lock().ok()?;
-        
+
         if let Some(ptr) = free_objects.pop_front() {
             *allocated_count += 1;
             Some(ptr)
@@ -137,23 +136,28 @@ impl ObjectPool {
             None
         }
     }
-    
+
     fn deallocate(&self, ptr: NonNull<u8>) {
-        if let (Ok(mut free_objects), Ok(mut allocated_count)) = 
-            (self.free_objects.lock(), self.allocated_count.lock()) {
-            
+        if let (Ok(mut free_objects), Ok(mut allocated_count)) =
+            (self.free_objects.lock(), self.allocated_count.lock())
+        {
             free_objects.push_back(ptr);
             *allocated_count = allocated_count.saturating_sub(1);
         }
     }
-    
+
     fn stats(&self) -> PoolStats {
-        let allocated_count = self.allocated_count.lock().unwrap_or_else(|_| {
-            panic!("Mutex poisoned")
-        });
-        
-        let free_count = self.free_objects.lock().map(|guard| guard.len()).unwrap_or(0);
-        
+        let allocated_count = self
+            .allocated_count
+            .lock()
+            .unwrap_or_else(|_| panic!("Mutex poisoned"));
+
+        let free_count = self
+            .free_objects
+            .lock()
+            .map(|guard| guard.len())
+            .unwrap_or(0);
+
         PoolStats {
             object_size: self.object_size,
             capacity: self.capacity,
@@ -168,7 +172,7 @@ impl Drop for ObjectPool {
         // Deallocate all objects
         if let Ok(mut free_objects) = self.free_objects.lock() {
             let layout = Layout::from_size_align(self.object_size, 8).unwrap();
-            
+
             while let Some(ptr) = free_objects.pop_front() {
                 unsafe {
                     dealloc(ptr.as_ptr(), layout);
@@ -191,17 +195,17 @@ impl PooledMemory {
     pub fn as_ptr(&self) -> *mut u8 {
         self.ptr.as_ptr()
     }
-    
+
     /// Get the size of the allocated memory
     pub fn size(&self) -> usize {
         self.size
     }
-    
+
     /// Get a slice view of the memory
     pub unsafe fn as_slice(&self) -> &[u8] {
         std::slice::from_raw_parts(self.ptr.as_ptr(), self.size)
     }
-    
+
     /// Get a mutable slice view of the memory
     pub unsafe fn as_mut_slice(&mut self) -> &mut [u8] {
         std::slice::from_raw_parts_mut(self.ptr.as_ptr(), self.size)
@@ -258,27 +262,27 @@ impl ZeroCopyBuffer {
             capacity,
         }
     }
-    
+
     /// Write data without copying (moves ownership)
     pub fn write_owned(&mut self, data: Vec<u8>) -> Result<()> {
         if data.len() > self.capacity {
             return Err(anyhow!("Data too large for buffer"));
         }
-        
+
         self.data = data;
         Ok(())
     }
-    
+
     /// Get a reference to the data
     pub fn data(&self) -> &[u8] {
         &self.data
     }
-    
+
     /// Clear the buffer without deallocating
     pub fn clear(&mut self) {
         self.data.clear();
     }
-    
+
     /// Get buffer statistics
     pub fn stats(&self) -> BufferStats {
         BufferStats {
@@ -303,22 +307,22 @@ mod tests {
     #[test]
     fn test_memory_pool() {
         let pool = MemoryPool::new(1024 * 1024).unwrap();
-        
+
         // Allocate some memory
         let mem1 = pool.allocate(64).unwrap();
         let mem2 = pool.allocate(256).unwrap();
-        
+
         assert_eq!(mem1.size(), 64);
         assert_eq!(mem2.size(), 256);
-        
+
         // Check stats
         let stats = pool.stats();
         assert_eq!(stats.used_size, 320);
-        
+
         // Deallocate
         pool.deallocate(mem1);
         pool.deallocate(mem2);
-        
+
         let stats = pool.stats();
         assert_eq!(stats.used_size, 0);
     }
@@ -326,12 +330,12 @@ mod tests {
     #[test]
     fn test_zero_copy_buffer() {
         let mut buffer = ZeroCopyBuffer::new(1024);
-        
+
         let data = vec![1, 2, 3, 4, 5];
         buffer.write_owned(data).unwrap();
-        
+
         assert_eq!(buffer.data(), &[1, 2, 3, 4, 5]);
-        
+
         let stats = buffer.stats();
         assert_eq!(stats.used, 5);
         assert_eq!(stats.free, 1019);

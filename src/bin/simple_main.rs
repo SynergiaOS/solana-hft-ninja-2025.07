@@ -1,11 +1,16 @@
 //! Simple Main - Working Bridge Implementation
-//! 
+//!
 //! This is a minimal working version that demonstrates the mempool→engine bridge.
 
 use anyhow::Result;
 use clap::Parser;
-use solana_hft_ninja::{config::Config, bridge::*, simple_engine::*, monitoring::{create_metrics, start_metrics_collection, MetricsServer}};
-use tracing::{info, error, warn};
+use solana_hft_ninja::{
+    bridge::*,
+    config::Config,
+    monitoring::{create_metrics, start_metrics_collection, MetricsServer},
+    simple_engine::*,
+};
+use tracing::{error, info, warn};
 
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
@@ -27,19 +32,19 @@ struct Args {
 async fn main() -> Result<()> {
     // Initialize logging
     tracing_subscriber::fmt::init();
-    
+
     info!("🚀 Solana HFT Ninja 2025.07 - Simple Bridge Demo");
     info!("================================================");
-    
+
     let args = Args::parse();
-    
+
     // Load configuration (with fallback)
     info!("📁 Loading configuration from: {}", args.config_path);
     let config = match Config::load(&args.config_path) {
         Ok(config) => {
             info!("✅ Configuration loaded successfully");
             config
-        },
+        }
         Err(e) => {
             warn!("Failed to load config: {}, using defaults", e);
             create_default_config()
@@ -49,11 +54,11 @@ async fn main() -> Result<()> {
     info!("🔧 Configuration:");
     info!("   - RPC URL: {}", config.solana.rpc_url);
     info!("   - Wallet path: {}", config.wallet.keypair_path);
-    
+
     // Initialize bridge
     let bridge_rx = init_bridge();
     info!("🌉 Bridge initialized successfully");
-    
+
     // Initialize metrics
     info!("📊 Initializing metrics system...");
     let metrics = create_metrics()?;
@@ -83,7 +88,7 @@ async fn main() -> Result<()> {
     info!("✅ Engine created successfully");
     info!("🔑 Wallet: {}", engine.wallet_pubkey());
     info!("📊 Metrics server started on http://localhost:8080/metrics");
-    
+
     // Start mempool listener if enabled
     let mempool_handle = if args.enable_mempool {
         info!("🎧 Starting bridge mempool listener...");
@@ -92,26 +97,26 @@ async fn main() -> Result<()> {
         warn!("⚠️  Mempool listener disabled - no real-time events");
         None
     };
-    
+
     // Print startup summary
     info!("📋 Startup Summary:");
     info!("   - Config path: {}", args.config_path);
     info!("   - Dry run: {}", args.dry_run);
     info!("   - Mempool enabled: {}", args.enable_mempool);
     info!("   - Bridge status: ✅ Active");
-    
+
     // Start the engine with bridge integration
     info!("🎯 Starting HFT Engine with bridge integration...");
     if let Err(e) = engine.run_with_bridge(bridge_rx).await {
         error!("❌ Engine error: {}", e);
         return Err(e);
     }
-    
+
     // Wait for mempool listener to finish (this won't happen in normal operation)
     if let Some(handle) = mempool_handle {
         handle.await?;
     }
-    
+
     Ok(())
 }
 
@@ -155,9 +160,9 @@ fn create_default_config() -> Config {
             rate_limit_rps: 100,
         },
         wallet_tracker: None, // Disabled by default
-        oumi_ai: None, // Disabled by default
-        opensearch_ai: None, // Disabled by default
-        lmcache: None, // Disabled by default
-        ai: None, // Disabled by default
+        oumi_ai: None,        // Disabled by default
+        opensearch_ai: None,  // Disabled by default
+        lmcache: None,        // Disabled by default
+        ai: None,             // Disabled by default
     }
 }

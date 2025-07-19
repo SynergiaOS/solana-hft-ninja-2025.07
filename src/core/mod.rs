@@ -2,33 +2,33 @@
 // High-performance, zero-copy trading engine with event-driven design
 
 pub mod engine;
-pub mod types;
 pub mod events;
 pub mod memory;
+pub mod types;
 pub mod wallet;
 
 // Legacy modules (to be refactored)
-pub mod transaction;
 pub mod balance;
-pub mod solana_client;
 pub mod devnet_trader;
+pub mod solana_client;
+pub mod transaction;
 
 // Re-export main types
 pub use engine::{Engine, EngineConfig};
-pub use types::{
-    Price, OrderBook, Trade, Position, Balance as NewBalance,
-    MarketData, TradingSignal, RiskMetrics
-};
 pub use events::{Event, EventBus, EventHandler};
 pub use memory::{MemoryPool, ObjectPool};
+pub use types::{
+    Balance as NewBalance, MarketData, OrderBook, Position, Price, RiskMetrics, Trade,
+    TradingSignal,
+};
 pub use wallet::Wallet;
 
 // Legacy exports (for compatibility)
-pub use wallet::WalletManager;
-pub use transaction::TransactionBuilder;
 pub use balance::BalanceTracker;
-pub use solana_client::{SolanaClient, TransactionResult, AccountInfo, SimulationResult};
-pub use devnet_trader::{DevnetTrader, TradeOrder, TradeAction, TradeResult, TradeStatus};
+pub use devnet_trader::{DevnetTrader, TradeAction, TradeOrder, TradeResult, TradeStatus};
+pub use solana_client::{AccountInfo, SimulationResult, SolanaClient, TransactionResult};
+pub use transaction::TransactionBuilder;
+pub use wallet::WalletManager;
 
 // Performance-critical constants
 pub const MAX_ORDER_BOOK_DEPTH: usize = 1000;

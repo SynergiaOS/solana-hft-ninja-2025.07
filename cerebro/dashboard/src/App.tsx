@@ -22,6 +22,7 @@ import EnhancedAnalysisPage from '@/pages/EnhancedAnalysisPage';
 import AIMemoryPage from '@/pages/AIMemoryPage';
 import WebhookEventsPage from '@/pages/WebhookEventsPage';
 import PredictionsPage from '@/pages/PredictionsPage';
+import LiveTradingPage from '@/pages/LiveTradingPage';
 
 // Hooks
 import { useBackendSync } from '@/hooks/useBackendSync';
@@ -64,6 +65,7 @@ function App() {
                 <Route index element={<Navigate to="/overview" replace />} />
                 <Route path="overview" element={<OverviewPage />} />
                 <Route path="trading" element={<TradingPage />} />
+                <Route path="live-trading" element={<LiveTradingPage />} />
                 <Route path="fingpt" element={<FinGPTPage />} />
                 <Route path="strategies" element={<StrategiesPage />} />
                 <Route path="analytics" element={<AnalyticsPage />} />

@@ -19,7 +19,7 @@ services:
       - '--web.console.templates=/etc/prometheus/consoles'
       - '--storage.tsdb.retention.time=30d'
       - '--web.enable-lifecycle'
-      - '--alertmanager.url=http://alertmanager:9093'
+      - '--web.enable-admin-api'
     networks:
       - monitoring
     healthcheck:

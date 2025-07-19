@@ -5,7 +5,7 @@ Project Cerebro - Simple BFF for testing DragonflyDB Cloud
 
 from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect, Request
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import Dict, Any, Optional
 import redis
 import httpx
@@ -17,6 +17,7 @@ import urllib.parse
 import random
 from datetime import datetime
 from dotenv import load_dotenv
+# MCP client will be imported when needed
 
 # Load environment variables
 load_dotenv()
@@ -1262,6 +1263,158 @@ async def get_devnet_wallet_balance():
         logger.error(f"Devnet wallet balance error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
+# ============================================================================
+# MCP (Machine-readable Cooperative Protocol) Endpoints
+# ============================================================================
+
+# Global MCP client
+mcp_client = None
+
+@app.on_event("startup")
+async def initialize_mcp():
+    """Initialize MCP client on startup"""
+    global mcp_client
+    try:
+        from mcp_client import create_mcp_client
+        mcp_client = await create_mcp_client()
+        logger.info("✅ MCP client initialized")
+    except Exception as e:
+        logger.error(f"Failed to initialize MCP client: {e}")
+
+@app.on_event("shutdown")
+async def cleanup_mcp():
+    """Cleanup MCP client on shutdown"""
+    global mcp_client
+    if mcp_client:
+        await mcp_client.close()
+
+class MCPToolRequest(BaseModel):
+    server_name: str = Field(description="Name of the MCP server")
+    tool_name: str = Field(description="Name of the tool to call")
+    parameters: Optional[Dict[str, Any]] = Field(default={}, description="Tool parameters")
+
+class MCPToolResponse(BaseModel):
+    success: bool
+    result: Optional[Dict[str, Any]] = None
+    error: Optional[str] = None
+    timestamp: str
+
+@app.get("/api/mcp/servers")
+async def get_mcp_servers():
+    """Get list of available MCP servers and their tools"""
+    if not mcp_client:
+        raise HTTPException(status_code=503, detail="MCP client not initialized")
+
+    try:
+        tools_by_server = await mcp_client.get_available_tools()
+        return {
+            "servers": list(mcp_client.servers.keys()),
+            "tools_by_server": tools_by_server,
+            "timestamp": datetime.now().isoformat()
+        }
+    except Exception as e:
+        logger.error(f"Error getting MCP servers: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/mcp/call", response_model=MCPToolResponse)
+async def call_mcp_tool(request: MCPToolRequest):
+    """Call a tool on an MCP server"""
+    if not mcp_client:
+        raise HTTPException(status_code=503, detail="MCP client not initialized")
+
+    try:
+        result = await mcp_client.call_tool(
+            request.server_name,
+            request.tool_name,
+            request.parameters
+        )
+
+        success = "error" not in result
+        return MCPToolResponse(
+            success=success,
+            result=result if success else None,
+            error=result.get("error") if not success else None,
+            timestamp=datetime.now().isoformat()
+        )
+
+    except Exception as e:
+        logger.error(f"Error calling MCP tool: {e}")
+        return MCPToolResponse(
+            success=False,
+            error=str(e),
+            timestamp=datetime.now().isoformat()
+        )
+
+@app.post("/api/mcp/n8n/trigger/{workflow_id}")
+async def trigger_n8n_workflow(workflow_id: str, data: Optional[Dict[str, Any]] = None):
+    """Trigger an n8n workflow via MCP"""
+    if not mcp_client:
+        raise HTTPException(status_code=503, detail="MCP client not initialized")
+
+    try:
+        result = await mcp_client.call_tool(
+            "n8n_workflows",
+            "trigger_workflow",
+            {"workflow_id": workflow_id, "data": data or {}}
+        )
+
+        return {
+            "workflow_id": workflow_id,
+            "triggered": "error" not in result,
+            "result": result,
+            "timestamp": datetime.now().isoformat()
+        }
+
+    except Exception as e:
+        logger.error(f"Error triggering n8n workflow: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/mcp/search/web")
+async def search_web_via_mcp(q: str, count: int = 10):
+    """Search the web using Brave Search via MCP"""
+    if not mcp_client:
+        raise HTTPException(status_code=503, detail="MCP client not initialized")
+
+    try:
+        result = await mcp_client.call_tool(
+            "brave_search",
+            "web_search",
+            {"q": q, "count": count}
+        )
+
+        return {
+            "query": q,
+            "results": result,
+            "timestamp": datetime.now().isoformat()
+        }
+
+    except Exception as e:
+        logger.error(f"Error searching web via MCP: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/mcp/search/news")
+async def search_news_via_mcp(q: str, count: int = 10):
+    """Search for news using Brave Search via MCP"""
+    if not mcp_client:
+        raise HTTPException(status_code=503, detail="MCP client not initialized")
+
+    try:
+        result = await mcp_client.call_tool(
+            "brave_search",
+            "news_search",
+            {"q": q, "count": count}
+        )
+
+        return {
+            "query": q,
+            "results": result,
+            "timestamp": datetime.now().isoformat()
+        }
+
+    except Exception as e:
+        logger.error(f"Error searching news via MCP: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8002)
+    uvicorn.run(app, host="0.0.0.0", port=8000)

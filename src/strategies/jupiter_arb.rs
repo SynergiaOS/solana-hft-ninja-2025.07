@@ -1,27 +1,27 @@
 //! Jupiter Arbitrage Strategy
-//! 
+//!
 //! Advanced arbitrage strategy specifically for Jupiter DEX
 
 use crate::{
     config::StrategyConfig,
-    types::MarketSnapshot,
-    strategy::{Strategy, Order, OrderSide},
     mempool::ParsedTransaction,
+    strategy::{Order, OrderSide, Strategy},
+    types::MarketSnapshot,
 };
 use anyhow::Result;
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use tracing::{info, debug, warn};
+use tracing::{debug, info, warn};
 
 /// Jupiter Arbitrage Strategy Configuration
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct JupiterArbConfig {
     pub enabled: bool,
-    pub min_profit: f64,  // Minimum profit in SOL
-    pub max_position: f64, // Maximum position size in SOL
-    pub dex_pairs: Vec<String>, // DEX pairs to monitor
-    pub slippage_tolerance: f64, // Maximum slippage tolerance
+    pub min_profit: f64,           // Minimum profit in SOL
+    pub max_position: f64,         // Maximum position size in SOL
+    pub dex_pairs: Vec<String>,    // DEX pairs to monitor
+    pub slippage_tolerance: f64,   // Maximum slippage tolerance
     pub execution_timeout_ms: u64, // Execution timeout
 }
 
@@ -88,7 +88,10 @@ impl JupiterArbStrategy {
     }
 
     /// Analyze transaction for Jupiter arbitrage opportunities
-    pub async fn analyze_transaction(&mut self, tx: &ParsedTransaction) -> Result<Vec<JupiterArbOpportunity>> {
+    pub async fn analyze_transaction(
+        &mut self,
+        tx: &ParsedTransaction,
+    ) -> Result<Vec<JupiterArbOpportunity>> {
         if !self.config.enabled {
             return Ok(vec![]);
         }
@@ -101,9 +104,15 @@ impl JupiterArbStrategy {
             if let Some(price_info) = self.extract_price_info(tx).await? {
                 // Check for arbitrage opportunities across other DEXs
                 for dex_pair in &self.config.dex_pairs {
-                    if let Some(opportunity) = self.check_arbitrage_opportunity(&price_info, dex_pair).await? {
+                    if let Some(opportunity) = self
+                        .check_arbitrage_opportunity(&price_info, dex_pair)
+                        .await?
+                    {
                         if opportunity.profit_sol >= self.config.min_profit {
-                            debug!("🎯 Jupiter arbitrage opportunity found: {} SOL profit", opportunity.profit_sol);
+                            debug!(
+                                "🎯 Jupiter arbitrage opportunity found: {} SOL profit",
+                                opportunity.profit_sol
+                            );
                             opportunities.push(opportunity);
                         }
                     }
@@ -117,9 +126,15 @@ impl JupiterArbStrategy {
     }
 
     /// Execute arbitrage opportunity
-    pub async fn execute_opportunity(&mut self, opportunity: &JupiterArbOpportunity) -> Result<bool> {
-        info!("⚖️ Executing Jupiter arbitrage: {} -> {}", opportunity.buy_dex, opportunity.sell_dex);
-        
+    pub async fn execute_opportunity(
+        &mut self,
+        opportunity: &JupiterArbOpportunity,
+    ) -> Result<bool> {
+        info!(
+            "⚖️ Executing Jupiter arbitrage: {} -> {}",
+            opportunity.buy_dex, opportunity.sell_dex
+        );
+
         // Validate opportunity is still profitable
         if !self.validate_opportunity(opportunity).await? {
             warn!("❌ Opportunity no longer profitable");
@@ -128,11 +143,14 @@ impl JupiterArbStrategy {
 
         // Execute simultaneous buy/sell
         let success = self.execute_simultaneous_trades(opportunity).await?;
-        
+
         if success {
             self.execution_count += 1;
             self.total_profit += opportunity.profit_sol;
-            info!("✅ Jupiter arbitrage executed successfully! Profit: {} SOL", opportunity.profit_sol);
+            info!(
+                "✅ Jupiter arbitrage executed successfully! Profit: {} SOL",
+                opportunity.profit_sol
+            );
         }
 
         Ok(success)
@@ -143,8 +161,8 @@ impl JupiterArbStrategy {
         // Check account keys for Jupiter program IDs
         tx.account_keys.iter().any(|key| {
             let key_str = hex::encode(key);
-            key_str.contains("jupiter") || 
-            key_str == "JUP4Fb2cqiRUcaTHdrPC8h2gNsA2ETXiPDD33WcGuJB" // Jupiter V6
+            key_str.contains("jupiter") || key_str == "JUP4Fb2cqiRUcaTHdrPC8h2gNsA2ETXiPDD33WcGuJB"
+            // Jupiter V6
         })
     }
 
@@ -160,21 +178,37 @@ impl JupiterArbStrategy {
     }
 
     /// Check for arbitrage opportunity
-    async fn check_arbitrage_opportunity(&self, price_info: &PriceInfo, dex_pair: &str) -> Result<Option<JupiterArbOpportunity>> {
+    async fn check_arbitrage_opportunity(
+        &self,
+        price_info: &PriceInfo,
+        dex_pair: &str,
+    ) -> Result<Option<JupiterArbOpportunity>> {
         // Get price from other DEX
-        let other_price = self.get_other_dex_price(&price_info.token_pair, dex_pair).await?;
-        
+        let other_price = self
+            .get_other_dex_price(&price_info.token_pair, dex_pair)
+            .await?;
+
         // Calculate profit potential
         let price_diff = (other_price - price_info.price).abs();
         let profit_percentage = price_diff / price_info.price;
-        
+
         if profit_percentage > self.config.slippage_tolerance {
             let profit_sol = price_diff * 0.1; // Simplified calculation
-            
+
             return Ok(Some(JupiterArbOpportunity {
                 token_pair: price_info.token_pair.clone(),
-                buy_dex: if price_info.price < other_price { "jupiter" } else { dex_pair }.to_string(),
-                sell_dex: if price_info.price < other_price { dex_pair } else { "jupiter" }.to_string(),
+                buy_dex: if price_info.price < other_price {
+                    "jupiter"
+                } else {
+                    dex_pair
+                }
+                .to_string(),
+                sell_dex: if price_info.price < other_price {
+                    dex_pair
+                } else {
+                    "jupiter"
+                }
+                .to_string(),
                 buy_price: price_info.price.min(other_price),
                 sell_price: price_info.price.max(other_price),
                 profit_sol,
@@ -200,23 +234,33 @@ impl JupiterArbStrategy {
     /// Validate opportunity is still profitable
     async fn validate_opportunity(&self, opportunity: &JupiterArbOpportunity) -> Result<bool> {
         // Re-check prices to ensure opportunity still exists
-        let current_buy_price = self.get_other_dex_price(&opportunity.token_pair, &opportunity.buy_dex).await?;
-        let current_sell_price = self.get_other_dex_price(&opportunity.token_pair, &opportunity.sell_dex).await?;
-        
+        let current_buy_price = self
+            .get_other_dex_price(&opportunity.token_pair, &opportunity.buy_dex)
+            .await?;
+        let current_sell_price = self
+            .get_other_dex_price(&opportunity.token_pair, &opportunity.sell_dex)
+            .await?;
+
         let current_profit = (current_sell_price - current_buy_price) * 0.1;
         Ok(current_profit >= self.config.min_profit)
     }
 
     /// Execute simultaneous trades
-    async fn execute_simultaneous_trades(&self, opportunity: &JupiterArbOpportunity) -> Result<bool> {
+    async fn execute_simultaneous_trades(
+        &self,
+        opportunity: &JupiterArbOpportunity,
+    ) -> Result<bool> {
         // Implementation would include:
         // 1. Build buy transaction on buy_dex
-        // 2. Build sell transaction on sell_dex  
+        // 2. Build sell transaction on sell_dex
         // 3. Submit both transactions simultaneously
         // 4. Monitor execution and handle failures
-        
-        info!("🔄 Executing simultaneous trades for {} profit", opportunity.profit_sol);
-        
+
+        info!(
+            "🔄 Executing simultaneous trades for {} profit",
+            opportunity.profit_sol
+        );
+
         // Mock successful execution
         Ok(true)
     }
@@ -237,7 +281,7 @@ impl Strategy for JupiterArbStrategy {
     async fn generate_orders(&self, market_snapshot: &MarketSnapshot) -> Result<Vec<Order>> {
         // Convert arbitrage opportunities to orders
         let mut orders = Vec::new();
-        
+
         for opportunity in &self.active_opportunities {
             if opportunity.profit_sol >= self.config.min_profit {
                 // Create buy order
@@ -247,7 +291,7 @@ impl Strategy for JupiterArbStrategy {
                     price: opportunity.buy_price,
                     market: opportunity.token_pair.clone(),
                 });
-                
+
                 // Create sell order
                 orders.push(Order {
                     side: OrderSide::Sell,
@@ -257,7 +301,7 @@ impl Strategy for JupiterArbStrategy {
                 });
             }
         }
-        
+
         Ok(orders)
     }
 

@@ -45,7 +45,14 @@ scrape_configs:
       - targets: ['postgres-exporter:9187']
     scrape_interval: 30s
 
-  # HFT Engine metrics
+  # HFT Ninja Engine metrics (LIVE INSTANCE)
+  - job_name: 'hft-ninja-live'
+    static_configs:
+      - targets: ['host.docker.internal:9090']  # Real HFT Ninja metrics server
+    scrape_interval: 5s  # High frequency for trading metrics
+    metrics_path: '/metrics'
+
+  # HFT Engine metrics (legacy/backup)
   - job_name: 'hft-engine'
     static_configs:
       - targets: ['hft-exporter:9200']

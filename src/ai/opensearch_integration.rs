@@ -1,13 +1,13 @@
 //! OpenSearch AI Integration for Solana HFT Ninja
-//! 
+//!
 //! Intelligent search and analytics for trading patterns
 
-use anyhow::{Result, Context};
+use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::collections::HashMap;
 use tokio::sync::RwLock;
-use tracing::{info, warn, debug, error};
+use tracing::{debug, info, warn};
 
 /// OpenSearch AI Configuration
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -188,12 +188,14 @@ impl OpenSearchEngine {
     /// Create new OpenSearch AI engine
     pub fn new(config: OpenSearchConfig) -> Result<Self> {
         info!("🔍 Initializing OpenSearch AI Engine...");
-        
+
         let client = reqwest::Client::builder()
-            .timeout(std::time::Duration::from_millis(config.vector_search.search_timeout_ms))
+            .timeout(std::time::Duration::from_millis(
+                config.vector_search.search_timeout_ms,
+            ))
             .build()
             .context("Failed to create HTTP client")?;
-        
+
         Ok(Self {
             config,
             client,
@@ -201,75 +203,107 @@ impl OpenSearchEngine {
             pattern_cache: RwLock::new(HashMap::new()),
         })
     }
-    
+
     /// Initialize indices and mappings
     pub async fn initialize(&self) -> Result<()> {
         if !self.config.enabled {
             warn!("🔍 OpenSearch AI is disabled");
             return Ok(());
         }
-        
+
         info!("🔍 Setting up OpenSearch indices...");
-        
+
         // Create indices with proper mappings
-        self.create_index(&self.config.indices.market_patterns, &self.get_pattern_mapping()).await?;
-        self.create_index(&self.config.indices.wallet_behaviors, &self.get_wallet_mapping()).await?;
-        self.create_index(&self.config.indices.price_movements, &self.get_price_mapping()).await?;
-        self.create_index(&self.config.indices.transaction_flows, &self.get_transaction_mapping()).await?;
-        self.create_index(&self.config.indices.mev_opportunities, &self.get_mev_mapping()).await?;
-        
+        self.create_index(
+            &self.config.indices.market_patterns,
+            &self.get_pattern_mapping(),
+        )
+        .await?;
+        self.create_index(
+            &self.config.indices.wallet_behaviors,
+            &self.get_wallet_mapping(),
+        )
+        .await?;
+        self.create_index(
+            &self.config.indices.price_movements,
+            &self.get_price_mapping(),
+        )
+        .await?;
+        self.create_index(
+            &self.config.indices.transaction_flows,
+            &self.get_transaction_mapping(),
+        )
+        .await?;
+        self.create_index(
+            &self.config.indices.mev_opportunities,
+            &self.get_mev_mapping(),
+        )
+        .await?;
+
         info!("🔍 OpenSearch AI Engine initialized successfully");
         Ok(())
     }
-    
+
     /// Create index with mapping
     async fn create_index(&self, index_name: &str, mapping: &Value) -> Result<()> {
         let url = format!("{}/{}", self.config.endpoint, index_name);
-        
-        let response = self.client
+
+        let response = self
+            .client
             .put(&url)
             .json(mapping)
             .send()
             .await
             .context("Failed to create index")?;
-        
+
         if response.status().is_success() {
             debug!("🔍 Created index: {}", index_name);
         } else {
-            warn!("🔍 Index {} may already exist or failed to create", index_name);
+            warn!(
+                "🔍 Index {} may already exist or failed to create",
+                index_name
+            );
         }
-        
+
         Ok(())
     }
-    
+
     /// Index market pattern data
     pub async fn index_pattern(&self, pattern_data: &Value) -> Result<String> {
         if !self.config.enabled {
             return Ok("disabled".to_string());
         }
-        
-        let url = format!("{}/{}/_doc", self.config.endpoint, self.config.indices.market_patterns);
-        
-        let response = self.client
+
+        let url = format!(
+            "{}/{}/_doc",
+            self.config.endpoint, self.config.indices.market_patterns
+        );
+
+        let response = self
+            .client
             .post(&url)
             .json(pattern_data)
             .send()
             .await
             .context("Failed to index pattern")?;
-        
+
         let result: Value = response.json().await?;
         let doc_id = result["_id"].as_str().unwrap_or("unknown").to_string();
-        
+
         debug!("🔍 Indexed pattern with ID: {}", doc_id);
         Ok(doc_id)
     }
-    
+
     /// Search for similar patterns
-    pub async fn search_similar_patterns(&self, query_vector: &[f32], pattern_type: Option<PatternType>) -> Result<Vec<SearchResult>> {
+    pub async fn search_similar_patterns(
+        &self,
+        query_vector: &[f32],
+        pattern_type: Option<PatternType>,
+    ) -> Result<Vec<SearchResult>> {
         if !self.config.enabled {
             return Ok(Vec::new());
         }
-        
+
         let mut query = json!({
             "size": self.config.vector_search.max_results,
             "min_score": self.config.vector_search.min_score,
@@ -285,7 +319,7 @@ impl OpenSearchEngine {
                 }
             }
         });
-        
+
         // Add pattern type filter if specified
         if let Some(pt) = pattern_type {
             query["query"]["script_score"]["query"] = json!({
@@ -294,21 +328,26 @@ impl OpenSearchEngine {
                 }
             });
         }
-        
-        let url = format!("{}/{}/_search", self.config.endpoint, self.config.indices.market_patterns);
-        
-        let response = self.client
+
+        let url = format!(
+            "{}/{}/_search",
+            self.config.endpoint, self.config.indices.market_patterns
+        );
+
+        let response = self
+            .client
             .post(&url)
             .json(&query)
             .send()
             .await
             .context("Failed to search patterns")?;
-        
+
         let result: Value = response.json().await?;
         let empty_vec = vec![];
         let hits = result["hits"]["hits"].as_array().unwrap_or(&empty_vec);
-        
-        let search_results: Vec<SearchResult> = hits.iter()
+
+        let search_results: Vec<SearchResult> = hits
+            .iter()
             .map(|hit| SearchResult {
                 id: hit["_id"].as_str().unwrap_or("").to_string(),
                 score: hit["_score"].as_f64().unwrap_or(0.0),
@@ -316,33 +355,40 @@ impl OpenSearchEngine {
                 highlights: None,
             })
             .collect();
-        
+
         debug!("🔍 Found {} similar patterns", search_results.len());
         Ok(search_results)
     }
-    
+
     /// Detect anomalies in market data
     pub async fn detect_anomalies(&self, market_data: &Value) -> Result<Vec<AnomalyResult>> {
         if !self.config.enabled || !self.config.analytics.anomaly_detection {
             return Ok(Vec::new());
         }
-        
+
         // Simulate anomaly detection (replace with actual OpenSearch ML)
         let mut anomalies = Vec::new();
-        
+
         // Check for price spikes
         if let Some(price_change) = market_data["price_change_24h"].as_f64() {
             if price_change.abs() > 50.0 {
                 anomalies.push(AnomalyResult {
-                    anomaly_type: if price_change > 0.0 { AnomalyType::PriceSpike } else { AnomalyType::PriceSpike },
+                    anomaly_type: if price_change > 0.0 {
+                        AnomalyType::PriceSpike
+                    } else {
+                        AnomalyType::PriceSpike
+                    },
                     severity: (price_change.abs() / 100.0).min(1.0),
                     description: format!("Unusual price movement: {:.2}%", price_change),
-                    affected_tokens: vec![market_data["token_address"].as_str().unwrap_or("unknown").to_string()],
+                    affected_tokens: vec![market_data["token_address"]
+                        .as_str()
+                        .unwrap_or("unknown")
+                        .to_string()],
                     timestamp: chrono::Utc::now().timestamp() as u64,
                 });
             }
         }
-        
+
         // Check for volume spikes
         if let Some(volume_change) = market_data["volume_change_24h"].as_f64() {
             if volume_change > 200.0 {
@@ -350,22 +396,25 @@ impl OpenSearchEngine {
                     anomaly_type: AnomalyType::VolumeSpike,
                     severity: (volume_change / 500.0).min(1.0),
                     description: format!("Unusual volume spike: {:.2}%", volume_change),
-                    affected_tokens: vec![market_data["token_address"].as_str().unwrap_or("unknown").to_string()],
+                    affected_tokens: vec![market_data["token_address"]
+                        .as_str()
+                        .unwrap_or("unknown")
+                        .to_string()],
                     timestamp: chrono::Utc::now().timestamp() as u64,
                 });
             }
         }
-        
+
         debug!("🔍 Detected {} anomalies", anomalies.len());
         Ok(anomalies)
     }
-    
+
     /// Analyze wallet behavior patterns
     pub async fn analyze_wallet_behavior(&self, wallet_address: &str) -> Result<PatternAnalysis> {
         if !self.config.enabled {
             return Err(anyhow::anyhow!("OpenSearch AI is disabled"));
         }
-        
+
         // Check cache first
         let cache_key = format!("wallet_{}", wallet_address);
         {
@@ -374,7 +423,7 @@ impl OpenSearchEngine {
                 return Ok(cached.clone());
             }
         }
-        
+
         // Search for wallet patterns
         let query = json!({
             "size": 100,
@@ -387,53 +436,59 @@ impl OpenSearchEngine {
                 {"timestamp": {"order": "desc"}}
             ]
         });
-        
-        let url = format!("{}/{}/_search", self.config.endpoint, self.config.indices.wallet_behaviors);
-        
-        let response = self.client
+
+        let url = format!(
+            "{}/{}/_search",
+            self.config.endpoint, self.config.indices.wallet_behaviors
+        );
+
+        let response = self
+            .client
             .post(&url)
             .json(&query)
             .send()
             .await
             .context("Failed to search wallet behavior")?;
-        
+
         let result: Value = response.json().await?;
         let empty_vec2 = vec![];
         let hits = result["hits"]["hits"].as_array().unwrap_or(&empty_vec2);
-        
+
         // Analyze patterns (simplified)
         let pattern_analysis = PatternAnalysis {
             pattern_type: PatternType::OrganicGrowth, // Default
             confidence: 0.75,
-            similar_patterns: hits.iter().take(5).map(|hit| SearchResult {
-                id: hit["_id"].as_str().unwrap_or("").to_string(),
-                score: hit["_score"].as_f64().unwrap_or(0.0),
-                source: hit["_source"].clone(),
-                highlights: None,
-            }).collect(),
-            risk_indicators: vec![
-                RiskIndicator {
-                    indicator_type: "transaction_frequency".to_string(),
-                    severity: RiskSeverity::Low,
-                    description: "Normal transaction frequency".to_string(),
-                    confidence: 0.8,
-                }
-            ],
+            similar_patterns: hits
+                .iter()
+                .take(5)
+                .map(|hit| SearchResult {
+                    id: hit["_id"].as_str().unwrap_or("").to_string(),
+                    score: hit["_score"].as_f64().unwrap_or(0.0),
+                    source: hit["_source"].clone(),
+                    highlights: None,
+                })
+                .collect(),
+            risk_indicators: vec![RiskIndicator {
+                indicator_type: "transaction_frequency".to_string(),
+                severity: RiskSeverity::Low,
+                description: "Normal transaction frequency".to_string(),
+                confidence: 0.8,
+            }],
             recommendations: vec![
                 "Monitor for unusual activity patterns".to_string(),
                 "Track large transactions".to_string(),
             ],
         };
-        
+
         // Cache result
         {
             let mut cache = self.pattern_cache.write().await;
             cache.insert(cache_key, pattern_analysis.clone());
         }
-        
+
         Ok(pattern_analysis)
     }
-    
+
     /// Get index mapping for patterns
     fn get_pattern_mapping(&self) -> Value {
         json!({
@@ -459,7 +514,7 @@ impl OpenSearchEngine {
             }
         })
     }
-    
+
     /// Get index mapping for wallets
     fn get_wallet_mapping(&self) -> Value {
         json!({
@@ -480,7 +535,7 @@ impl OpenSearchEngine {
             }
         })
     }
-    
+
     /// Get index mapping for prices
     fn get_price_mapping(&self) -> Value {
         json!({
@@ -498,7 +553,7 @@ impl OpenSearchEngine {
             }
         })
     }
-    
+
     /// Get index mapping for transactions
     fn get_transaction_mapping(&self) -> Value {
         json!({
@@ -517,7 +572,7 @@ impl OpenSearchEngine {
             }
         })
     }
-    
+
     /// Get index mapping for MEV opportunities
     fn get_mev_mapping(&self) -> Value {
         json!({

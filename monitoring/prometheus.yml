@@ -17,12 +17,19 @@ alerting:
           - alertmanager:9093
 
 scrape_configs:
-  # HFT Application Metrics
-  - job_name: 'hft-ninja'
+  # HFT Application Metrics (LIVE INSTANCE)
+  - job_name: 'hft-ninja-live'
     static_configs:
-      - targets: ['hft-ninja:8080']
+      - targets: ['host.docker.internal:9090']  # Real HFT Ninja metrics server
     scrape_interval: 5s
     metrics_path: /metrics
+
+  # HFT Application API Health
+  - job_name: 'hft-ninja-api'
+    static_configs:
+      - targets: ['host.docker.internal:8080']  # Real HFT Ninja API server
+    scrape_interval: 15s
+    metrics_path: /health
     
   # Prometheus Self-Monitoring
   - job_name: 'prometheus'

@@ -10,7 +10,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::time::{Duration, Instant};
 use tokio::time::timeout;
-use tracing::{debug, error, info, warn};
+use tracing::{debug, info, warn};
 
 /// Position sizing request for Kelly Criterion calculation
 #[derive(Debug, Clone, Serialize)]
@@ -149,19 +149,22 @@ impl DeepSeekClient {
     /// Check if DeepSeek-Math API is healthy
     pub async fn health_check(&self) -> Result<HealthResponse> {
         let url = format!("{}/health", self.config.api_url);
-        
-        let response = timeout(
-            Duration::from_secs(10),
-            self.client.get(&url).send()
-        ).await
-        .context("Health check timeout")?
-        .context("Health check request failed")?;
+
+        let response = timeout(Duration::from_secs(10), self.client.get(&url).send())
+            .await
+            .context("Health check timeout")?
+            .context("Health check request failed")?;
 
         if !response.status().is_success() {
-            return Err(anyhow::anyhow!("Health check failed: {}", response.status()));
+            return Err(anyhow::anyhow!(
+                "Health check failed: {}",
+                response.status()
+            ));
         }
 
-        let health: HealthResponse = response.json().await
+        let health: HealthResponse = response
+            .json()
+            .await
             .context("Failed to parse health response")?;
 
         debug!("🧮 DeepSeek-Math health: {:?}", health);
@@ -183,7 +186,9 @@ impl DeepSeekClient {
         debug!("🧮 Calculating position size: {:?}", request);
 
         let response = self.make_request(&url, &request).await?;
-        let calculation: CalculationResponse = response.json().await
+        let calculation: CalculationResponse = response
+            .json()
+            .await
             .context("Failed to parse position size response")?;
 
         let latency = start_time.elapsed().as_millis();
@@ -191,7 +196,11 @@ impl DeepSeekClient {
 
         info!(
             "✅ Position size calculated: {:.4} SOL (confidence: {:.2}%, latency: {}ms)",
-            calculation.result.get("position_size").and_then(|v| v.as_f64()).unwrap_or(0.0),
+            calculation
+                .result
+                .get("position_size")
+                .and_then(|v| v.as_f64())
+                .unwrap_or(0.0),
             calculation.confidence * 100.0,
             latency
         );
@@ -214,14 +223,24 @@ impl DeepSeekClient {
         debug!("🧮 Calculating arbitrage profit: {:?}", request);
 
         let response = self.make_request(&url, &request).await?;
-        let calculation: CalculationResponse = response.json().await
+        let calculation: CalculationResponse = response
+            .json()
+            .await
             .context("Failed to parse arbitrage response")?;
 
         let latency = start_time.elapsed().as_millis();
         self.update_metrics(latency as f64, &calculation).await;
 
-        let profit_sol = calculation.result.get("profit_sol").and_then(|v| v.as_f64()).unwrap_or(0.0);
-        let feasible = calculation.result.get("feasible").and_then(|v| v.as_bool()).unwrap_or(false);
+        let profit_sol = calculation
+            .result
+            .get("profit_sol")
+            .and_then(|v| v.as_f64())
+            .unwrap_or(0.0);
+        let feasible = calculation
+            .result
+            .get("feasible")
+            .and_then(|v| v.as_bool())
+            .unwrap_or(false);
 
         info!(
             "✅ Arbitrage profit calculated: {:.4} SOL (feasible: {}, confidence: {:.2}%)",
@@ -248,14 +267,24 @@ impl DeepSeekClient {
         debug!("🧮 Calculating sandwich parameters: {:?}", request);
 
         let response = self.make_request(&url, &request).await?;
-        let calculation: CalculationResponse = response.json().await
+        let calculation: CalculationResponse = response
+            .json()
+            .await
             .context("Failed to parse sandwich response")?;
 
         let latency = start_time.elapsed().as_millis();
         self.update_metrics(latency as f64, &calculation).await;
 
-        let expected_profit = calculation.result.get("expected_profit").and_then(|v| v.as_f64()).unwrap_or(0.0);
-        let risk_score = calculation.result.get("risk_score").and_then(|v| v.as_f64()).unwrap_or(0.5);
+        let expected_profit = calculation
+            .result
+            .get("expected_profit")
+            .and_then(|v| v.as_f64())
+            .unwrap_or(0.0);
+        let risk_score = calculation
+            .result
+            .get("risk_score")
+            .and_then(|v| v.as_f64())
+            .unwrap_or(0.5);
 
         info!(
             "✅ Sandwich parameters calculated: {:.4} SOL profit (risk: {:.2}, confidence: {:.2}%)",
@@ -282,7 +311,9 @@ impl DeepSeekClient {
         debug!("🧮 Assessing trading risk: {:?}", request);
 
         let response = self.make_request(&url, &request).await?;
-        let assessment: RiskAssessmentResponse = response.json().await
+        let assessment: RiskAssessmentResponse = response
+            .json()
+            .await
             .context("Failed to parse risk assessment response")?;
 
         let latency = start_time.elapsed().as_millis();
@@ -301,15 +332,24 @@ impl DeepSeekClient {
     /// Get performance metrics
     pub async fn get_metrics(&self) -> Result<DeepSeekMetrics> {
         let url = format!("{}/metrics", self.config.api_url);
-        
-        let response = self.client.get(&url).send().await
+
+        let response = self
+            .client
+            .get(&url)
+            .send()
+            .await
             .context("Failed to get metrics")?;
 
         if !response.status().is_success() {
-            return Err(anyhow::anyhow!("Metrics request failed: {}", response.status()));
+            return Err(anyhow::anyhow!(
+                "Metrics request failed: {}",
+                response.status()
+            ));
         }
 
-        let metrics: DeepSeekMetrics = response.json().await
+        let metrics: DeepSeekMetrics = response
+            .json()
+            .await
             .context("Failed to parse metrics response")?;
 
         Ok(metrics)
@@ -318,8 +358,12 @@ impl DeepSeekClient {
     /// Clear model cache to reduce memory usage
     pub async fn clear_cache(&self) -> Result<()> {
         let url = format!("{}/cache/clear", self.config.api_url);
-        
-        let response = self.client.post(&url).send().await
+
+        let response = self
+            .client
+            .post(&url)
+            .send()
+            .await
             .context("Failed to clear cache")?;
 
         if !response.status().is_success() {
@@ -335,8 +379,7 @@ impl DeepSeekClient {
         if self.daily_cost_usd >= self.config.cost_limit_usd {
             warn!(
                 "💰 Daily cost limit reached: ${:.6} >= ${:.6}",
-                self.daily_cost_usd,
-                self.config.cost_limit_usd
+                self.daily_cost_usd, self.config.cost_limit_usd
             );
             return Ok(false);
         }
@@ -354,8 +397,10 @@ impl DeepSeekClient {
         for attempt in 1..=self.config.max_retries {
             match timeout(
                 Duration::from_secs(self.config.timeout_seconds),
-                self.client.post(url).json(payload).send()
-            ).await {
+                self.client.post(url).json(payload).send(),
+            )
+            .await
+            {
                 Ok(Ok(response)) => {
                     if response.status().is_success() {
                         return Ok(response);
@@ -374,7 +419,11 @@ impl DeepSeekClient {
             if attempt < self.config.max_retries {
                 let delay = Duration::from_millis(100 * attempt as u64);
                 tokio::time::sleep(delay).await;
-                debug!("🔄 Retrying request (attempt {}/{})", attempt + 1, self.config.max_retries);
+                debug!(
+                    "🔄 Retrying request (attempt {}/{})",
+                    attempt + 1,
+                    self.config.max_retries
+                );
             }
         }
 
@@ -384,33 +433,28 @@ impl DeepSeekClient {
     /// Update performance metrics
     async fn update_metrics(&mut self, latency_ms: f64, calculation: &CalculationResponse) {
         self.request_count += 1;
-        
+
         // Estimate cost (very rough approximation)
         let estimated_cost = (calculation.execution_time_ms as f64 / 1000.0) * 0.000001;
         self.daily_cost_usd += estimated_cost;
 
         debug!(
             "📊 DeepSeek metrics: requests={}, cost=${:.6}, latency={:.1}ms",
-            self.request_count,
-            self.daily_cost_usd,
-            latency_ms
+            self.request_count, self.daily_cost_usd, latency_ms
         );
     }
 
     /// Update risk assessment metrics
     async fn update_risk_metrics(&mut self, latency_ms: f64, assessment: &RiskAssessmentResponse) {
         self.request_count += 1;
-        
+
         // Estimate cost for risk assessment
         let estimated_cost = 0.000002; // Slightly higher for risk assessment
         self.daily_cost_usd += estimated_cost;
 
         debug!(
             "📊 Risk assessment metrics: requests={}, cost=${:.6}, latency={:.1}ms, risk={:.2}",
-            self.request_count,
-            self.daily_cost_usd,
-            latency_ms,
-            assessment.risk_score
+            self.request_count, self.daily_cost_usd, latency_ms, assessment.risk_score
         );
     }
 

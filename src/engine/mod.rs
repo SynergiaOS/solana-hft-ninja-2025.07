@@ -1,10 +1,10 @@
+use crate::mempool::router::{EventPriority, MempoolEvent, OpportunityType};
 use crate::{config::Config, market::MarketData, strategy::Strategy};
-use crate::mempool::router::{MempoolEvent, OpportunityType, EventPriority};
 use anyhow::Result;
-use tokio::sync::{mpsc, broadcast};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
-use tracing::{info, warn, error, debug};
+use tokio::sync::broadcast;
+use tracing::{debug, error, info, warn};
 
 pub struct Engine {
     config: Config,
@@ -47,7 +47,10 @@ impl Engine {
     }
 
     /// Run engine with mempool integration for real-time MEV
-    pub async fn run_with_mempool(&mut self, mut mempool_rx: broadcast::Receiver<Arc<MempoolEvent>>) -> Result<()> {
+    pub async fn run_with_mempool(
+        &mut self,
+        mut mempool_rx: broadcast::Receiver<Arc<MempoolEvent>>,
+    ) -> Result<()> {
         info!("Starting HFT Engine with mempool integration...");
 
         let mut last_strategy_run = Instant::now();
@@ -99,7 +102,10 @@ impl Engine {
                 error!("Strategy execution error: {}", e);
             }
 
-            tokio::time::sleep(Duration::from_millis(self.config.strategy.update_interval_ms)).await;
+            tokio::time::sleep(Duration::from_millis(
+                self.config.strategy.update_interval_ms,
+            ))
+            .await;
         }
     }
 
@@ -123,9 +129,15 @@ impl Engine {
         let deadline_ns = event.timestamp_ns + self.get_execution_deadline(event.priority);
 
         match &event.opportunity_type {
-            OpportunityType::Sandwich { swap_amount_in, slippage_bps, .. } => {
-                let estimated_profit = self.calculate_sandwich_profit(*swap_amount_in, *slippage_bps);
-                if estimated_profit > 0.01 { // Minimum 0.01 SOL profit
+            OpportunityType::Sandwich {
+                swap_amount_in,
+                slippage_bps,
+                ..
+            } => {
+                let estimated_profit =
+                    self.calculate_sandwich_profit(*swap_amount_in, *slippage_bps);
+                if estimated_profit > 0.01 {
+                    // Minimum 0.01 SOL profit
                     Some(MevOpportunity {
                         opportunity_type: event.opportunity_type.clone(),
                         estimated_profit_sol: estimated_profit,
@@ -138,9 +150,15 @@ impl Engine {
                 }
             }
 
-            OpportunityType::Arbitrage { profit_bps, optimal_amount, .. } => {
-                let estimated_profit = (*optimal_amount as f64 * *profit_bps as f64) / (10_000.0 * 1e9);
-                if estimated_profit > 0.005 { // Minimum 0.005 SOL profit
+            OpportunityType::Arbitrage {
+                profit_bps,
+                optimal_amount,
+                ..
+            } => {
+                let estimated_profit =
+                    (*optimal_amount as f64 * *profit_bps as f64) / (10_000.0 * 1e9);
+                if estimated_profit > 0.005 {
+                    // Minimum 0.005 SOL profit
                     Some(MevOpportunity {
                         opportunity_type: event.opportunity_type.clone(),
                         estimated_profit_sol: estimated_profit,
@@ -153,7 +171,10 @@ impl Engine {
                 }
             }
 
-            OpportunityType::NewToken { initial_liquidity_sol, .. } => {
+            OpportunityType::NewToken {
+                initial_liquidity_sol,
+                ..
+            } => {
                 let estimated_profit = (*initial_liquidity_sol as f64 * 0.02) / 1e9; // 2% of liquidity
                 Some(MevOpportunity {
                     opportunity_type: event.opportunity_type.clone(),
@@ -171,10 +192,10 @@ impl Engine {
     /// Get execution deadline based on priority
     fn get_execution_deadline(&self, priority: EventPriority) -> u64 {
         match priority {
-            EventPriority::Critical => 50_000_000,   // 50ms
-            EventPriority::High => 100_000_000,      // 100ms
-            EventPriority::Medium => 500_000_000,    // 500ms
-            EventPriority::Low => 2_000_000_000,     // 2s
+            EventPriority::Critical => 50_000_000, // 50ms
+            EventPriority::High => 100_000_000,    // 100ms
+            EventPriority::Medium => 500_000_000,  // 500ms
+            EventPriority::Low => 2_000_000_000,   // 2s
         }
     }
 
@@ -209,12 +230,18 @@ impl MevProcessor {
     }
 
     /// Execute MEV opportunity
-    pub async fn execute_opportunity(&mut self, opportunity: MevOpportunity) -> Result<MevExecutionResult> {
+    pub async fn execute_opportunity(
+        &mut self,
+        opportunity: MevOpportunity,
+    ) -> Result<MevExecutionResult> {
         let start_time = Instant::now();
         self.processed_count += 1;
 
         if self.dry_run {
-            info!("DRY RUN: Would execute MEV opportunity: {:?}", opportunity.opportunity_type);
+            info!(
+                "DRY RUN: Would execute MEV opportunity: {:?}",
+                opportunity.opportunity_type
+            );
             self.successful_count += 1;
             return Ok(MevExecutionResult {
                 success: true,
@@ -227,15 +254,9 @@ impl MevProcessor {
 
         // Real execution logic would go here
         match opportunity.opportunity_type {
-            OpportunityType::Sandwich { .. } => {
-                self.execute_sandwich_attack(opportunity).await
-            }
-            OpportunityType::Arbitrage { .. } => {
-                self.execute_arbitrage(opportunity).await
-            }
-            OpportunityType::NewToken { .. } => {
-                self.execute_token_snipe(opportunity).await
-            }
+            OpportunityType::Sandwich { .. } => self.execute_sandwich_attack(opportunity).await,
+            OpportunityType::Arbitrage { .. } => self.execute_arbitrage(opportunity).await,
+            OpportunityType::NewToken { .. } => self.execute_token_snipe(opportunity).await,
             _ => {
                 warn!("Unknown opportunity type, skipping execution");
                 Ok(MevExecutionResult {
@@ -250,7 +271,10 @@ impl MevProcessor {
     }
 
     /// Execute sandwich attack (placeholder)
-    async fn execute_sandwich_attack(&mut self, opportunity: MevOpportunity) -> Result<MevExecutionResult> {
+    async fn execute_sandwich_attack(
+        &mut self,
+        opportunity: MevOpportunity,
+    ) -> Result<MevExecutionResult> {
         let start_time = Instant::now();
 
         // TODO: Implement actual sandwich execution
@@ -270,7 +294,10 @@ impl MevProcessor {
     }
 
     /// Execute arbitrage opportunity
-    async fn execute_arbitrage(&mut self, opportunity: MevOpportunity) -> Result<MevExecutionResult> {
+    async fn execute_arbitrage(
+        &mut self,
+        opportunity: MevOpportunity,
+    ) -> Result<MevExecutionResult> {
         let start_time = Instant::now();
 
         // TODO: Implement arbitrage execution
@@ -278,7 +305,10 @@ impl MevProcessor {
         // 2. Build swap transactions for both DEXes
         // 3. Submit as atomic bundle
 
-        info!("Arbitrage execution placeholder - would execute: {:?}", opportunity.opportunity_type);
+        info!(
+            "Arbitrage execution placeholder - would execute: {:?}",
+            opportunity.opportunity_type
+        );
         self.successful_count += 1;
 
         Ok(MevExecutionResult {
@@ -291,7 +321,10 @@ impl MevProcessor {
     }
 
     /// Execute token sniping
-    async fn execute_token_snipe(&mut self, opportunity: MevOpportunity) -> Result<MevExecutionResult> {
+    async fn execute_token_snipe(
+        &mut self,
+        opportunity: MevOpportunity,
+    ) -> Result<MevExecutionResult> {
         let start_time = Instant::now();
 
         // TODO: Implement token sniping
@@ -299,7 +332,10 @@ impl MevProcessor {
         // 2. Build immediate buy transaction
         // 3. Submit with high priority fee
 
-        info!("Token snipe execution placeholder - would execute: {:?}", opportunity.opportunity_type);
+        info!(
+            "Token snipe execution placeholder - would execute: {:?}",
+            opportunity.opportunity_type
+        );
         self.successful_count += 1;
 
         Ok(MevExecutionResult {

@@ -1,10 +1,10 @@
 // 🥷 Event System - Zero-Copy, Lock-Free Communication
 // High-performance event bus for sub-microsecond message passing
 
-use crate::core::types::{Price, OrderBook, Trade, Position, TradingSignal, MarketData};
+use crate::core::types::{MarketData, OrderBook, Position, Price, Trade, TradingSignal};
+use anyhow::Result;
 use std::sync::Arc;
 use tokio::sync::{broadcast, mpsc};
-use anyhow::Result;
 use tracing::{debug, warn};
 
 /// Core event types for the trading system
@@ -23,7 +23,7 @@ pub enum Event {
     MarketDataSnapshot {
         data: Arc<MarketData>,
     },
-    
+
     // Trading events
     TradeExecuted {
         trade: Arc<Trade>,
@@ -34,7 +34,7 @@ pub enum Event {
     TradingSignal {
         signal: Arc<TradingSignal>,
     },
-    
+
     // System events
     StrategyStarted {
         strategy_name: String,
@@ -48,7 +48,7 @@ pub enum Event {
     SystemShutdown {
         timestamp: u64,
     },
-    
+
     // Risk management events
     RiskLimitExceeded {
         symbol_id: u32,
@@ -57,7 +57,7 @@ pub enum Event {
         limit_value: f64,
         timestamp: u64,
     },
-    
+
     // Performance events
     LatencyAlert {
         component: String,
@@ -107,7 +107,7 @@ impl Event {
             Event::LatencyAlert { .. } => EventType::LatencyAlert,
         }
     }
-    
+
     pub fn timestamp(&self) -> u64 {
         match self {
             Event::PriceUpdate { timestamp, .. } => *timestamp,
@@ -129,10 +129,10 @@ impl Event {
 pub struct EventBus {
     // Broadcast channel for real-time events (low latency)
     broadcast_tx: broadcast::Sender<Event>,
-    
+
     // MPSC channels for specific handlers (high throughput)
     handler_channels: Vec<mpsc::UnboundedSender<Event>>,
-    
+
     // Event statistics
     events_sent: std::sync::atomic::AtomicU64,
     events_dropped: std::sync::atomic::AtomicU64,
@@ -141,7 +141,7 @@ pub struct EventBus {
 impl EventBus {
     pub fn new(buffer_size: usize) -> Self {
         let (broadcast_tx, _) = broadcast::channel(buffer_size);
-        
+
         Self {
             broadcast_tx,
             handler_channels: Vec::new(),
@@ -149,44 +149,48 @@ impl EventBus {
             events_dropped: std::sync::atomic::AtomicU64::new(0),
         }
     }
-    
+
     /// Publish event to all subscribers
     pub fn publish(&self, event: Event) -> Result<()> {
         let start_time = std::time::Instant::now();
-        
+
         // Send to broadcast channel (for real-time subscribers)
         match self.broadcast_tx.send(event.clone()) {
             Ok(_) => {
-                self.events_sent.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                self.events_sent
+                    .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
             }
             Err(_) => {
-                self.events_dropped.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                self.events_dropped
+                    .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
                 warn!("Event dropped: no broadcast subscribers");
             }
         }
-        
+
         // Send to dedicated handler channels
         for channel in &self.handler_channels {
             if let Err(_) = channel.send(event.clone()) {
-                self.events_dropped.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                self.events_dropped
+                    .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
                 warn!("Event dropped: handler channel full");
             }
         }
-        
+
         // Log latency if it exceeds threshold
         let latency = start_time.elapsed();
-        if latency.as_nanos() > 1000 { // 1 microsecond threshold
+        if latency.as_nanos() > 1000 {
+            // 1 microsecond threshold
             debug!("Event publish latency: {}ns", latency.as_nanos());
         }
-        
+
         Ok(())
     }
-    
+
     /// Subscribe to events with broadcast receiver
     pub fn subscribe(&self) -> broadcast::Receiver<Event> {
         self.broadcast_tx.subscribe()
     }
-    
+
     /// Register a dedicated event handler
     pub fn register_handler(&mut self, handler: Arc<dyn EventHandler>) {
         let (tx, rx) = mpsc::unbounded_channel();
@@ -208,12 +212,14 @@ impl EventBus {
             }
         });
     }
-    
+
     /// Get event statistics
     pub fn stats(&self) -> EventBusStats {
         EventBusStats {
             events_sent: self.events_sent.load(std::sync::atomic::Ordering::Relaxed),
-            events_dropped: self.events_dropped.load(std::sync::atomic::Ordering::Relaxed),
+            events_dropped: self
+                .events_dropped
+                .load(std::sync::atomic::Ordering::Relaxed),
             active_subscribers: self.broadcast_tx.receiver_count(),
             handler_count: self.handler_channels.len(),
         }
@@ -241,23 +247,23 @@ impl EventFilter {
             symbol_ids: None,
         }
     }
-    
+
     pub fn with_event_types(mut self, types: Vec<EventType>) -> Self {
         self.event_types = types;
         self
     }
-    
+
     pub fn with_symbols(mut self, symbol_ids: Vec<u32>) -> Self {
         self.symbol_ids = Some(symbol_ids);
         self
     }
-    
+
     pub fn matches(&self, event: &Event) -> bool {
         // Check event type
         if !self.event_types.is_empty() && !self.event_types.contains(&event.event_type()) {
             return false;
         }
-        
+
         // Check symbol filter
         if let Some(ref symbol_ids) = self.symbol_ids {
             let event_symbol = match event {
@@ -270,14 +276,14 @@ impl EventFilter {
                 Event::RiskLimitExceeded { symbol_id, .. } => Some(*symbol_id),
                 _ => None,
             };
-            
+
             if let Some(symbol_id) = event_symbol {
                 if !symbol_ids.contains(&symbol_id) {
                     return false;
                 }
             }
         }
-        
+
         true
     }
 }
@@ -289,18 +295,18 @@ mod tests {
 
     #[tokio::test]
     async fn test_event_bus() {
-        let mut bus = EventBus::new(1000);
+        let bus = EventBus::new(1000);
         let mut receiver = bus.subscribe();
-        
+
         let event = Event::PriceUpdate {
             symbol_id: 1,
             price: Price::from_sol(23.45),
             volume: 1000,
             timestamp: current_timestamp(),
         };
-        
+
         bus.publish(event.clone()).unwrap();
-        
+
         let received = receiver.recv().await.unwrap();
         assert_eq!(received.event_type(), EventType::PriceUpdate);
     }
@@ -310,21 +316,21 @@ mod tests {
         let filter = EventFilter::new()
             .with_event_types(vec![EventType::PriceUpdate])
             .with_symbols(vec![1, 2]);
-        
+
         let event1 = Event::PriceUpdate {
             symbol_id: 1,
             price: Price::from_sol(23.45),
             volume: 1000,
             timestamp: current_timestamp(),
         };
-        
+
         let event2 = Event::PriceUpdate {
             symbol_id: 3,
             price: Price::from_sol(24.00),
             volume: 1000,
             timestamp: current_timestamp(),
         };
-        
+
         assert!(filter.matches(&event1));
         assert!(!filter.matches(&event2));
     }

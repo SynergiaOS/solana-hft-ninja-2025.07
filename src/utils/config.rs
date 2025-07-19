@@ -1,8 +1,8 @@
 // 🥷 Configuration Management - Unified Config System
 // High-performance configuration with validation
 
+use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
-use anyhow::{Result, Context};
 use std::path::Path;
 
 /// Main configuration structure
@@ -68,41 +68,39 @@ pub struct StrategiesConfig {
 impl Config {
     /// Load configuration from file
     pub fn load<P: AsRef<Path>>(path: P) -> Result<Self> {
-        let content = std::fs::read_to_string(path)
-            .context("Failed to read config file")?;
-        
-        let config: Config = toml::from_str(&content)
-            .context("Failed to parse config file")?;
-        
+        let content = std::fs::read_to_string(path).context("Failed to read config file")?;
+
+        let config: Config = toml::from_str(&content).context("Failed to parse config file")?;
+
         config.validate()?;
         Ok(config)
     }
-    
+
     /// Validate configuration
     pub fn validate(&self) -> Result<()> {
         // Validate Solana config
         if self.solana.rpc_url.is_empty() {
             return Err(anyhow::anyhow!("Solana RPC URL cannot be empty"));
         }
-        
+
         // Validate wallet config
         if self.wallet.path.is_empty() {
             return Err(anyhow::anyhow!("Wallet path cannot be empty"));
         }
-        
+
         // Validate trading config
         if self.trading.max_position_size <= 0.0 {
             return Err(anyhow::anyhow!("Max position size must be positive"));
         }
-        
+
         // Validate risk config
         if self.risk.max_daily_loss <= 0.0 {
             return Err(anyhow::anyhow!("Max daily loss must be positive"));
         }
-        
+
         Ok(())
     }
-    
+
     /// Get default configuration
     pub fn default() -> Self {
         Self {

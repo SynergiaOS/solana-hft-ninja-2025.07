@@ -12,7 +12,7 @@ impl WebSocketClient {
     pub fn new(url: String) -> Self {
         Self { url }
     }
-    
+
     pub async fn connect(&self) -> Result<()> {
         // Placeholder implementation
         tracing::info!("Connecting to WebSocket: {}", self.url);

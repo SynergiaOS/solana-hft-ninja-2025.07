@@ -3,29 +3,26 @@
 use solana_hft_ninja::mempool::*;
 use std::env;
 use tokio::sync::mpsc;
-use tracing::{info, Level};
+use tracing::{info, error, Level};
 
 #[tokio::main]
-async fn main() -> Result<(), Box<dyn std::error::Error>> {
+async fn main() -> solana_hft_ninja::mempool::Result<()> {
     // Initialize logging
-    tracing_subscriber::fmt()
-        .with_max_level(Level::INFO)
-        .init();
+    tracing_subscriber::fmt().with_max_level(Level::INFO).init();
 
     info!("Starting mempool listener example...");
 
     // Get Helius API key from environment
-    let api_key = env::var("HELIUS_KEY")
-        .expect("HELIUS_KEY environment variable must be set");
+    let api_key = env::var("HELIUS_KEY").expect("HELIUS_KEY environment variable must be set");
 
     // Create channel for receiving parsed transactions
     let (tx, mut rx) = mpsc::unbounded_channel();
 
     // Configure Helius connection
-    let config = HeliusConfig {
+    let config = solana_hft_ninja::mempool::listener::HeliusConfig {
         api_key,
         endpoint: "https://api.helius.xyz".to_string(),
-        commitment: CommitmentLevel::Processed,
+        commitment: solana_hft_ninja::mempool::listener::CommitmentLevel::Processed,
         max_reconnect_attempts: 10,
         reconnect_delay_ms: 1000,
     };
@@ -54,7 +51,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         // Print transaction summary
         info!(
             "Transaction {}: slot={}, timestamp={}, dex_interactions={}",
-            bs58::encode(&parsed_tx.signature).into_string(),
+            solana_sdk::bs58::encode(&parsed_tx.signature).into_string(),
             parsed_tx.slot,
             parsed_tx.timestamp,
             parsed_tx.dex_interactions.len()
@@ -65,7 +62,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             dex_count += 1;
 
             info!(
-                "  DEX: {} - {} ({} accounts)",
+                "  DEX: {} - {:?} ({} accounts)",
                 interaction.program.name(),
                 interaction.instruction_type,
                 interaction.accounts.len()
@@ -87,7 +84,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             info!("  Transactions processed: {}", stats.transactions_processed);
             info!("  DEX interactions: {}", stats.dex_detections);
             info!("  Bytes received: {}", stats.bytes_received);
-            info!("  Memory usage: {} MB", stats.memory_usage_bytes / 1024 / 1024);
+            info!(
+                "  Memory usage: {} MB",
+                stats.memory_usage_bytes / 1024 / 1024
+            );
             info!("  Connection attempts: {}", stats.connection_attempts);
             info!("  Connection failures: {}", stats.connection_failures);
             info!("  Deserialization errors: {}", stats.deserialization_errors);
@@ -95,7 +95,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     // Wait for listener to finish
-    listener_handle.await?;
+    listener_handle.await.map_err(|e| solana_hft_ninja::mempool::MempoolError::Config(e.to_string()))?;
 
     Ok(())
 }

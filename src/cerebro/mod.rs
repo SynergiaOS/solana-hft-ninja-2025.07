@@ -1,18 +1,17 @@
 //! Cerebro Integration Module
-//! 
+//!
 //! Bridge between Rust HFT engine and Python Cerebro AI system
 
 pub mod webhook_client;
 
 pub use webhook_client::{
-    WebhookClient, WebhookConfig, OpportunityEvent, ExecutionEvent, 
-    RiskEvent, WalletEvent, WebhookStats
+    ExecutionEvent, OpportunityEvent, RiskEvent, WalletEvent, WebhookClient, WebhookConfig,
+    WebhookStats,
 };
 
 use anyhow::Result;
 use std::sync::Arc;
-use tokio::sync::RwLock;
-use tracing::{info, warn, error};
+use tracing::{info, warn};
 
 /// Cerebro integration manager
 pub struct CerebroIntegration {
@@ -25,7 +24,7 @@ impl CerebroIntegration {
     /// Create new Cerebro integration
     pub fn new(config: WebhookConfig) -> Self {
         let webhook_client = Arc::new(WebhookClient::new(config.clone()));
-        
+
         Self {
             webhook_client,
             config,
@@ -201,8 +200,8 @@ impl CerebroIntegration {
 
 /// Helper functions for creating metadata
 pub mod metadata {
-    use std::collections::HashMap;
     use serde_json::Value;
+    use std::collections::HashMap;
 
     /// Create metadata for MEV opportunity
     pub fn mev_opportunity(
@@ -212,20 +211,29 @@ pub mod metadata {
         holder_count: Option<u32>,
     ) -> HashMap<String, Value> {
         let mut metadata = HashMap::new();
-        
+
         if let Some(pool) = pool_address {
             metadata.insert("pool_address".to_string(), Value::String(pool.to_string()));
         }
         if let Some(liquidity) = liquidity_sol {
-            metadata.insert("liquidity_sol".to_string(), Value::Number(serde_json::Number::from_f64(liquidity).unwrap()));
+            metadata.insert(
+                "liquidity_sol".to_string(),
+                Value::Number(serde_json::Number::from_f64(liquidity).unwrap()),
+            );
         }
         if let Some(volume) = volume_24h {
-            metadata.insert("volume_24h".to_string(), Value::Number(serde_json::Number::from_f64(volume).unwrap()));
+            metadata.insert(
+                "volume_24h".to_string(),
+                Value::Number(serde_json::Number::from_f64(volume).unwrap()),
+            );
         }
         if let Some(holders) = holder_count {
-            metadata.insert("holder_count".to_string(), Value::Number(serde_json::Number::from(holders)));
+            metadata.insert(
+                "holder_count".to_string(),
+                Value::Number(serde_json::Number::from(holders)),
+            );
         }
-        
+
         metadata
     }
 
@@ -237,20 +245,29 @@ pub mod metadata {
         bundle_position: Option<u32>,
     ) -> HashMap<String, Value> {
         let mut metadata = HashMap::new();
-        
+
         if let Some(slip) = slippage {
-            metadata.insert("slippage".to_string(), Value::Number(serde_json::Number::from_f64(slip).unwrap()));
+            metadata.insert(
+                "slippage".to_string(),
+                Value::Number(serde_json::Number::from_f64(slip).unwrap()),
+            );
         }
         if let Some(impact) = price_impact {
-            metadata.insert("price_impact".to_string(), Value::Number(serde_json::Number::from_f64(impact).unwrap()));
+            metadata.insert(
+                "price_impact".to_string(),
+                Value::Number(serde_json::Number::from_f64(impact).unwrap()),
+            );
         }
         if let Some(r) = route {
             metadata.insert("route".to_string(), Value::String(r.to_string()));
         }
         if let Some(pos) = bundle_position {
-            metadata.insert("bundle_position".to_string(), Value::Number(serde_json::Number::from(pos)));
+            metadata.insert(
+                "bundle_position".to_string(),
+                Value::Number(serde_json::Number::from(pos)),
+            );
         }
-        
+
         metadata
     }
 
@@ -262,20 +279,32 @@ pub mod metadata {
         max_drawdown: Option<f64>,
     ) -> HashMap<String, Value> {
         let mut metadata = HashMap::new();
-        
+
         if let Some(balance) = current_balance {
-            metadata.insert("current_balance".to_string(), Value::Number(serde_json::Number::from_f64(balance).unwrap()));
+            metadata.insert(
+                "current_balance".to_string(),
+                Value::Number(serde_json::Number::from_f64(balance).unwrap()),
+            );
         }
         if let Some(positions) = position_count {
-            metadata.insert("position_count".to_string(), Value::Number(serde_json::Number::from(positions)));
+            metadata.insert(
+                "position_count".to_string(),
+                Value::Number(serde_json::Number::from(positions)),
+            );
         }
         if let Some(pnl) = daily_pnl {
-            metadata.insert("daily_pnl".to_string(), Value::Number(serde_json::Number::from_f64(pnl).unwrap()));
+            metadata.insert(
+                "daily_pnl".to_string(),
+                Value::Number(serde_json::Number::from_f64(pnl).unwrap()),
+            );
         }
         if let Some(drawdown) = max_drawdown {
-            metadata.insert("max_drawdown".to_string(), Value::Number(serde_json::Number::from_f64(drawdown).unwrap()));
+            metadata.insert(
+                "max_drawdown".to_string(),
+                Value::Number(serde_json::Number::from_f64(drawdown).unwrap()),
+            );
         }
-        
+
         metadata
     }
 
@@ -287,20 +316,32 @@ pub mod metadata {
         risk_score: Option<f64>,
     ) -> HashMap<String, Value> {
         let mut metadata = HashMap::new();
-        
+
         if let Some(tx_count) = transaction_count {
-            metadata.insert("transaction_count".to_string(), Value::Number(serde_json::Number::from(tx_count)));
+            metadata.insert(
+                "transaction_count".to_string(),
+                Value::Number(serde_json::Number::from(tx_count)),
+            );
         }
         if let Some(success) = success_rate {
-            metadata.insert("success_rate".to_string(), Value::Number(serde_json::Number::from_f64(success).unwrap()));
+            metadata.insert(
+                "success_rate".to_string(),
+                Value::Number(serde_json::Number::from_f64(success).unwrap()),
+            );
         }
         if let Some(profit) = average_profit {
-            metadata.insert("average_profit".to_string(), Value::Number(serde_json::Number::from_f64(profit).unwrap()));
+            metadata.insert(
+                "average_profit".to_string(),
+                Value::Number(serde_json::Number::from_f64(profit).unwrap()),
+            );
         }
         if let Some(risk) = risk_score {
-            metadata.insert("risk_score".to_string(), Value::Number(serde_json::Number::from_f64(risk).unwrap()));
+            metadata.insert(
+                "risk_score".to_string(),
+                Value::Number(serde_json::Number::from_f64(risk).unwrap()),
+            );
         }
-        
+
         metadata
     }
 }

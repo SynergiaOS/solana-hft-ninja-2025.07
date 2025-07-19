@@ -1,13 +1,13 @@
 //! Bridge Integration Tests
-//! 
+//!
 //! Tests for mempool→engine communication
 
+use anyhow::Result;
 use solana_hft_ninja::{
     bridge::{init_bridge, send_bridge_event, subscribe_to_bridge, BridgeEvent, EventType},
     mempool::helius::TransactionNotification,
 };
 use tokio::time::{timeout, Duration};
-use anyhow::Result;
 
 /// Mock DEX detector for testing
 struct MockDexDetector;
@@ -17,10 +17,15 @@ impl MockDexDetector {
         Self
     }
 
-    fn detect_from_parsed(&self, signature: &str, program: &str, accounts: &[&str]) -> Vec<BridgeEvent> {
+    fn detect_from_parsed(
+        &self,
+        signature: &str,
+        program: &str,
+        accounts: &[&str],
+    ) -> Vec<BridgeEvent> {
         let priority = match program {
             "Raydium" | "Orca" | "Jupiter" => 0, // Highest priority
-            _ => 2, // Medium priority
+            _ => 2,                              // Medium priority
         };
 
         vec![BridgeEvent {
@@ -39,7 +44,7 @@ impl MockDexDetector {
 async fn test_bridge_communication() -> Result<()> {
     // Initialize bridge
     let mut bridge_rx = init_bridge();
-    
+
     // Send test event
     let test_event = BridgeEvent {
         event_type: EventType::DexTransaction {
@@ -50,14 +55,14 @@ async fn test_bridge_communication() -> Result<()> {
         timestamp: chrono::Utc::now().timestamp() as u64,
         priority: 0, // Highest priority
     };
-    
+
     send_bridge_event(test_event.clone())?;
-    
+
     // Verify event received
     let received = timeout(Duration::from_secs(1), bridge_rx.recv()).await??;
     assert_eq!(received.priority, 0);
     assert_eq!(received.timestamp, test_event.timestamp);
-    
+
     println!("✅ Bridge communication test passed");
     Ok(())
 }
@@ -113,21 +118,21 @@ async fn test_priority_ordering() -> Result<()> {
 async fn test_dex_detection() -> Result<()> {
     // Create a simple DEX detector for testing
     let detector = MockDexDetector::new();
-    
+
     // Test Raydium detection
     let raydium_tx = create_mock_transaction("Raydium", vec!["pool_account"]);
     let events = detector.detect_from_parsed("test_sig", "Raydium", &["pool_account"]);
-    
+
     assert!(!events.is_empty());
     assert_eq!(events[0].priority, 0); // Raydium should have highest priority
-    
+
     // Test unknown DEX
     let unknown_tx = create_mock_transaction("UnknownDEX", vec!["account"]);
     let events = detector.detect_from_parsed("test_sig", "UnknownDEX", &["account"]);
-    
+
     assert!(!events.is_empty());
     assert_eq!(events[0].priority, 2); // Medium priority for unknown
-    
+
     println!("✅ DEX detection test passed");
     Ok(())
 }
@@ -173,22 +178,22 @@ async fn test_exponential_backoff() -> Result<()> {
     // Test reconnection logic with exponential backoff
     let mut attempt = 1;
     let max_attempts = 5;
-    
+
     while attempt <= max_attempts {
         let delay = std::cmp::min(1000 * 2_u64.pow(attempt - 1), 30000);
         println!("🔄 Reconnection attempt {}: delay {}ms", attempt, delay);
-        
+
         // Simulate connection attempt
         tokio::time::sleep(Duration::from_millis(10)).await; // Fast simulation
-        
+
         if attempt == 3 {
             println!("✅ Connection successful on attempt {}", attempt);
             break;
         }
-        
+
         attempt += 1;
     }
-    
+
     assert!(attempt <= max_attempts);
     println!("✅ Exponential backoff test passed");
     Ok(())
@@ -198,7 +203,7 @@ async fn test_exponential_backoff() -> Result<()> {
 async fn test_memory_limits() -> Result<()> {
     // Test memory usage stays within 16MB limit
     let initial_memory = get_memory_usage();
-    
+
     // Simulate heavy processing
     let mut events = Vec::new();
     for i in 0..1000 {
@@ -212,14 +217,17 @@ async fn test_memory_limits() -> Result<()> {
             priority: (i % 256) as u8,
         });
     }
-    
+
     let final_memory = get_memory_usage();
     let memory_increase = final_memory - initial_memory;
-    
+
     // Should stay under 16MB (16 * 1024 * 1024 bytes)
     assert!(memory_increase < 16 * 1024 * 1024);
-    
-    println!("✅ Memory limits test passed: {}MB increase", memory_increase / 1024 / 1024);
+
+    println!(
+        "✅ Memory limits test passed: {}MB increase",
+        memory_increase / 1024 / 1024
+    );
     Ok(())
 }
 

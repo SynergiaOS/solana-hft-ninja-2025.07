@@ -16,7 +16,7 @@ import {
   SparklesIcon,
   WalletIcon,
 } from '@heroicons/react/24/outline';
-import { Brain } from 'lucide-react';
+import { Brain, Activity } from 'lucide-react';
 import ConnectionStatus from '@/components/ui/ConnectionStatus';
 
 interface SidebarProps {
@@ -26,6 +26,7 @@ interface SidebarProps {
 const navigation = [
   { name: 'Dashboard', href: '/overview', icon: HomeIcon },
   { name: 'Trading', href: '/trading', icon: ChartBarIcon },
+  { name: 'Live Trading', href: '/live-trading', icon: Activity, badge: 'LIVE' },
   { name: 'FinGPT AI', href: '/fingpt', icon: CpuChipIcon, badge: 'AI' },
   { name: 'Enhanced AI', href: '/enhanced', icon: Brain, badge: 'NEW' },
   // 🆕 New AI & Memory Navigation

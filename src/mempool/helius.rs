@@ -1,16 +1,16 @@
 //! Helius WebSocket Client
-//! 
+//!
 //! Real-time mempool monitoring via Helius WebSocket API
 
-use anyhow::{Result, Context};
+use anyhow::{Context, Result};
+use futures::{SinkExt, StreamExt};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::time::Duration;
 use tokio::time::{sleep, timeout};
 use tokio_tungstenite::{connect_async, tungstenite::Message};
-use tracing::{info, warn, error, debug};
+use tracing::{debug, error, info, warn};
 use url::Url;
-use futures::{SinkExt, StreamExt};
 
 /// Helius WebSocket configuration
 #[derive(Debug, Clone)]
@@ -92,12 +92,12 @@ impl HeliusClient {
                 }
                 Err(e) => {
                     error!("Helius WebSocket error: {}", e);
-                    
+
                     if self.reconnect_count >= self.config.max_reconnect_attempts {
                         error!("Max reconnection attempts reached, giving up");
                         return Err(e);
                     }
-                    
+
                     self.reconnect_count += 1;
                     warn!(
                         "Reconnecting in {:?} (attempt {}/{})",
@@ -105,12 +105,12 @@ impl HeliusClient {
                         self.reconnect_count,
                         self.config.max_reconnect_attempts
                     );
-                    
+
                     sleep(self.config.reconnect_interval).await;
                 }
             }
         }
-        
+
         Ok(())
     }
 
@@ -122,22 +122,20 @@ impl HeliusClient {
         // Build WebSocket URL with API key
         let ws_url = format!("{}/?api-key={}", self.config.endpoint, self.config.api_key);
         let url = Url::parse(&ws_url).context("Invalid WebSocket URL")?;
-        
+
         info!("Connecting to Helius WebSocket: {}", self.config.endpoint);
-        
+
         // Connect to WebSocket
-        let (ws_stream, _) = timeout(
-            Duration::from_secs(10),
-            connect_async(url)
-        ).await
-        .context("WebSocket connection timeout")?
-        .context("Failed to connect to WebSocket")?;
-        
+        let (ws_stream, _) = timeout(Duration::from_secs(10), connect_async(url))
+            .await
+            .context("WebSocket connection timeout")?
+            .context("Failed to connect to WebSocket")?;
+
         let (mut ws_sender, mut ws_receiver) = ws_stream.split();
-        
+
         info!("✅ Connected to Helius WebSocket");
         self.reset_reconnect_count();
-        
+
         // Subscribe to mempool transactions
         let subscription = SubscriptionRequest {
             jsonrpc: "2.0".to_string(),
@@ -151,13 +149,15 @@ impl HeliusClient {
                 "accountExclude": []
             }),
         };
-        
+
         let subscription_msg = Message::Text(serde_json::to_string(&subscription)?);
-        ws_sender.send(subscription_msg).await
+        ws_sender
+            .send(subscription_msg)
+            .await
             .context("Failed to send subscription")?;
-        
+
         info!("📡 Subscribed to mempool transactions");
-        
+
         // Start ping task (simplified - no clone needed for this demo)
         let mut ping_interval = tokio::time::interval(self.config.ping_interval);
 
@@ -169,7 +169,7 @@ impl HeliusClient {
                 break; // Exit for now
             }
         });
-        
+
         // Listen for messages
         while let Some(msg) = ws_receiver.next().await {
             match msg {
@@ -192,7 +192,7 @@ impl HeliusClient {
                 _ => {}
             }
         }
-        
+
         Ok(())
     }
 
@@ -202,29 +202,29 @@ impl HeliusClient {
         text: &str,
         tx: &tokio::sync::mpsc::UnboundedSender<TransactionNotification>,
     ) -> Result<()> {
-        let response: HeliusResponse = serde_json::from_str(text)
-            .context("Failed to parse WebSocket message")?;
-        
+        let response: HeliusResponse =
+            serde_json::from_str(text).context("Failed to parse WebSocket message")?;
+
         // Handle subscription confirmation
         if let Some(result) = response.result {
             debug!("Subscription result: {:?}", result);
             return Ok(());
         }
-        
+
         // Handle transaction notification
         if response.method.as_deref() == Some("transactionNotification") {
             if let Some(params) = response.params {
                 let notification: TransactionNotification = serde_json::from_value(params)
                     .context("Failed to parse transaction notification")?;
-                
+
                 debug!("Received transaction: {}", notification.signature);
-                
+
                 if let Err(e) = tx.send(notification) {
                     warn!("Failed to send transaction to bridge: {}", e);
                 }
             }
         }
-        
+
         Ok(())
     }
 
@@ -241,12 +241,12 @@ pub async fn start_helius_listener(
 ) -> Result<tokio::sync::mpsc::UnboundedReceiver<TransactionNotification>> {
     let (tx, rx) = tokio::sync::mpsc::unbounded_channel();
     let mut client = HeliusClient::new(config);
-    
+
     tokio::spawn(async move {
         if let Err(e) = client.start_mempool_listener(tx).await {
             error!("Helius listener failed: {}", e);
         }
     });
-    
+
     Ok(rx)
 }

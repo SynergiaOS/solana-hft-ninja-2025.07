@@ -2,13 +2,12 @@
 
 use futures::{SinkExt, StreamExt};
 use serde::{Deserialize, Serialize};
-use solana_sdk::pubkey::Pubkey;
 use std::sync::Arc;
 use tokio::sync::{mpsc, RwLock};
 use tokio_tungstenite::{connect_async, tungstenite::protocol::Message as WsMessage};
 use tracing::{error, info, warn};
 
-use crate::mempool::{error::*, metrics::*, parser::*, dex::*};
+use crate::mempool::{error::*, metrics::*, parser::*};
 
 /// Helius WebSocket configuration
 #[derive(Debug, Clone)]
@@ -120,11 +119,11 @@ impl MempoolListener {
     /// Start the mempool listener
     pub async fn start(&self) -> Result<()> {
         info!("Starting mempool listener...");
-        
+
         *self.is_running.write().await = true;
-        
+
         let mut reconnect_attempts = 0;
-        
+
         while *self.is_running.read().await {
             if reconnect_attempts >= self.config.max_reconnect_attempts {
                 error!("Max reconnect attempts reached, stopping listener");
@@ -141,9 +140,12 @@ impl MempoolListener {
                     self.metrics.increment_connection_failures();
                     error!(
                         "WebSocket connection error: {}, reconnecting in {}ms (attempt {}/{})",
-                        e, self.config.reconnect_delay_ms, reconnect_attempts, self.config.max_reconnect_attempts
+                        e,
+                        self.config.reconnect_delay_ms,
+                        reconnect_attempts,
+                        self.config.max_reconnect_attempts
                     );
-                    
+
                     tokio::time::sleep(tokio::time::Duration::from_millis(
                         self.config.reconnect_delay_ms,
                     ))
@@ -154,7 +156,7 @@ impl MempoolListener {
 
         *self.is_running.write().await = false;
         info!("Mempool listener stopped");
-        
+
         Ok(())
     }
 
@@ -174,12 +176,10 @@ impl MempoolListener {
         info!("Connecting to Helius WebSocket: {}", ws_url);
         self.metrics.increment_connection_attempts();
 
-        let (ws_stream, _) = connect_async(ws_url)
-            .await
-            .map_err(MempoolError::from)?;
+        let (ws_stream, _) = connect_async(ws_url).await.map_err(MempoolError::from)?;
 
         info!("Connected to Helius WebSocket");
-        
+
         let (mut ws_sender, mut ws_receiver) = ws_stream.split();
 
         // Subscribe to transaction notifications
@@ -234,7 +234,8 @@ impl MempoolListener {
             WsMessage::Binary(data) => {
                 // Handle binary data if needed
                 if let Ok(text) = String::from_utf8(data) {
-                    if let Ok(notification) = serde_json::from_str::<TransactionNotification>(&text) {
+                    if let Ok(notification) = serde_json::from_str::<TransactionNotification>(&text)
+                    {
                         self.process_transaction_notification(notification).await?;
                     }
                 }
@@ -254,13 +255,19 @@ impl MempoolListener {
     }
 
     /// Process transaction notification
-    async fn process_transaction_notification(&self, notification: TransactionNotification) -> Result<()> {
+    async fn process_transaction_notification(
+        &self,
+        notification: TransactionNotification,
+    ) -> Result<()> {
         let slot = notification.params.result.slot;
         let timestamp = notification.params.result.block_time.unwrap_or(0);
         let transaction_data = notification.params.result.transaction;
 
         // Parse transaction using zero-copy deserialization
-        match self.parser.parse_transaction(&transaction_data, timestamp, slot) {
+        match self
+            .parser
+            .parse_transaction(&transaction_data, timestamp, slot)
+        {
             Ok(parsed_tx) => {
                 // Send parsed transaction to processing channel
                 if let Err(e) = self.tx_sender.send(parsed_tx) {
@@ -338,7 +345,12 @@ impl MempoolListenerBuilder {
             MempoolError::Config("Transaction sender channel required".to_string())
         })?;
 
-        Ok(MempoolListener::new(self.config, parser, metrics, tx_sender))
+        Ok(MempoolListener::new(
+            self.config,
+            parser,
+            metrics,
+            tx_sender,
+        ))
     }
 }
 
@@ -356,12 +368,12 @@ mod tests {
     #[tokio::test]
     async fn test_listener_builder() {
         let (tx, _rx) = mpsc::unbounded_channel();
-        
+
         let listener = MempoolListenerBuilder::new()
             .with_sender(tx)
             .build()
             .unwrap();
-            
+
         assert!(!listener.is_running().await);
     }
 
@@ -369,7 +381,7 @@ mod tests {
     async fn test_config_validation() {
         let mut config = HeliusConfig::default();
         config.api_key = "test-key".to_string();
-        
+
         assert_eq!(config.api_key, "test-key");
         assert_eq!(config.endpoint, "https://api.helius.xyz");
     }
@@ -389,6 +401,7 @@ mod tests {
 
         let json = serde_json::to_string(&subscription).unwrap();
         assert!(json.contains("transactionSubscribe"));
-        assert!(json.contains("processed"));
+        // CommitmentLevel::Processed is serialized as "Processed" (with capital P)
+        assert!(json.contains("Processed"));
     }
 }

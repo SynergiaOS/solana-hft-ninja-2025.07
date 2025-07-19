@@ -1,5 +1,5 @@
 //! Advanced MEV Strategies
-//! 
+//!
 //! Sophisticated MEV extraction strategies for Solana HFT Ninja 2025.07
 
 use anyhow::Result;
@@ -7,41 +7,43 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::RwLock;
-use tracing::{info, warn, error, debug};
+use tracing::{debug, info, warn};
 
-use crate::mempool::{ParsedTransaction, DexInteraction};
-use crate::strategies::mev::{AdvancedMevOpportunity as MevOpportunity, AdvancedMevStrategyType as MevStrategyType};
+use crate::mempool::ParsedTransaction;
+use crate::strategies::mev::{
+    AdvancedMevOpportunity as MevOpportunity, AdvancedMevStrategyType as MevStrategyType,
+};
 
 /// Advanced MEV strategy configuration
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AdvancedMevConfig {
     /// Minimum profit threshold for sandwich attacks (in SOL)
     pub min_sandwich_profit_sol: f64,
-    
+
     /// Maximum position size for sandwich attacks (in SOL)
     pub max_sandwich_position_sol: f64,
-    
+
     /// Minimum arbitrage profit threshold (in SOL)
     pub min_arbitrage_profit_sol: f64,
-    
+
     /// Maximum slippage tolerance for arbitrage (in bps)
     pub max_arbitrage_slippage_bps: u32,
-    
+
     /// Minimum liquidation profit threshold (in SOL)
     pub min_liquidation_profit_sol: f64,
-    
+
     /// Maximum gas price for MEV transactions (in lamports)
     pub max_gas_price_lamports: u64,
-    
+
     /// Enable sandwich attack strategy
     pub enable_sandwich_attacks: bool,
-    
+
     /// Enable arbitrage strategy
     pub enable_arbitrage: bool,
-    
+
     /// Enable liquidation hunting
     pub enable_liquidation_hunting: bool,
-    
+
     /// Risk management settings
     pub max_concurrent_positions: u32,
     pub position_timeout_seconds: u64,
@@ -153,14 +155,14 @@ impl AdvancedMevStrategy {
     /// Create new advanced MEV strategy
     pub fn new(config: AdvancedMevConfig) -> Self {
         info!("🎯 Initializing Advanced MEV Strategy...");
-        
+
         let sandwich_detector = SandwichDetector::new(config.clone());
         let arbitrage_detector = ArbitrageDetector::new(config.clone());
         let liquidation_detector = LiquidationDetector::new(config.clone());
         let active_positions = Arc::new(RwLock::new(HashMap::new()));
-        
+
         info!("✅ Advanced MEV Strategy initialized");
-        
+
         Self {
             config,
             sandwich_detector,
@@ -169,51 +171,57 @@ impl AdvancedMevStrategy {
             active_positions,
         }
     }
-    
+
     /// Analyze transaction for MEV opportunities
-    pub async fn analyze_transaction(&mut self, tx: &ParsedTransaction) -> Result<Vec<MevOpportunity>> {
+    pub async fn analyze_transaction(
+        &mut self,
+        tx: &ParsedTransaction,
+    ) -> Result<Vec<MevOpportunity>> {
         let mut opportunities = Vec::new();
-        
+
         // Sandwich attack detection
         if self.config.enable_sandwich_attacks {
             if let Some(sandwich_op) = self.sandwich_detector.detect_opportunity(tx).await? {
                 opportunities.push(sandwich_op);
             }
         }
-        
+
         // Arbitrage detection
         if self.config.enable_arbitrage {
             if let Some(arbitrage_op) = self.arbitrage_detector.detect_opportunity(tx).await? {
                 opportunities.push(arbitrage_op);
             }
         }
-        
+
         // Liquidation detection
         if self.config.enable_liquidation_hunting {
             if let Some(liquidation_op) = self.liquidation_detector.detect_opportunity(tx).await? {
                 opportunities.push(liquidation_op);
             }
         }
-        
+
         // Filter opportunities by profitability and risk
         let filtered_opportunities = self.filter_opportunities(opportunities).await?;
-        
+
         debug!("Found {} MEV opportunities", filtered_opportunities.len());
-        
+
         Ok(filtered_opportunities)
     }
-    
+
     /// Filter opportunities by profitability and risk
-    async fn filter_opportunities(&self, opportunities: Vec<MevOpportunity>) -> Result<Vec<MevOpportunity>> {
+    async fn filter_opportunities(
+        &self,
+        opportunities: Vec<MevOpportunity>,
+    ) -> Result<Vec<MevOpportunity>> {
         let mut filtered = Vec::new();
         let active_positions = self.active_positions.read().await;
-        
+
         // Check if we're at max concurrent positions
         if active_positions.len() >= self.config.max_concurrent_positions as usize {
             warn!("🚫 Max concurrent positions reached, skipping new opportunities");
             return Ok(filtered);
         }
-        
+
         for opportunity in opportunities {
             // Check minimum profit threshold
             let min_profit = match opportunity.strategy_type {
@@ -221,50 +229,49 @@ impl AdvancedMevStrategy {
                 MevStrategyType::Arbitrage => self.config.min_arbitrage_profit_sol,
                 MevStrategyType::Liquidation => self.config.min_liquidation_profit_sol,
             };
-            
+
             if opportunity.estimated_profit_sol >= min_profit {
                 filtered.push(opportunity);
             }
         }
-        
+
         Ok(filtered)
     }
-    
+
     /// Execute MEV opportunity
     pub async fn execute_opportunity(&mut self, opportunity: MevOpportunity) -> Result<String> {
         let position_id = format!("mev_{}", uuid::Uuid::new_v4());
-        
+
         // Create active position
         let position = ActivePosition {
             position_id: position_id.clone(),
             strategy_type: opportunity.strategy_type.clone(),
-            entry_time: std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_secs(),
+            entry_time: std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_secs(),
             expected_profit: opportunity.estimated_profit_sol,
             status: PositionStatus::Executing,
         };
-        
+
         // Add to active positions
         {
             let mut active_positions = self.active_positions.write().await;
             active_positions.insert(position_id.clone(), position);
         }
-        
-        info!("🚀 Executing MEV opportunity: {} (expected profit: {} SOL)", 
-              position_id, opportunity.estimated_profit_sol);
-        
+
+        info!(
+            "🚀 Executing MEV opportunity: {} (expected profit: {} SOL)",
+            position_id, opportunity.estimated_profit_sol
+        );
+
         // Execute based on strategy type
         let result = match opportunity.strategy_type {
-            MevStrategyType::SandwichAttack => {
-                self.execute_sandwich_attack(opportunity).await
-            }
-            MevStrategyType::Arbitrage => {
-                self.execute_arbitrage(opportunity).await
-            }
-            MevStrategyType::Liquidation => {
-                self.execute_liquidation(opportunity).await
-            }
+            MevStrategyType::SandwichAttack => self.execute_sandwich_attack(opportunity).await,
+            MevStrategyType::Arbitrage => self.execute_arbitrage(opportunity).await,
+            MevStrategyType::Liquidation => self.execute_liquidation(opportunity).await,
         };
-        
+
         // Update position status
         {
             let mut active_positions = self.active_positions.write().await;
@@ -276,56 +283,56 @@ impl AdvancedMevStrategy {
                 };
             }
         }
-        
+
         result
     }
-    
+
     /// Execute sandwich attack
     async fn execute_sandwich_attack(&self, opportunity: MevOpportunity) -> Result<String> {
         info!("🥪 Executing sandwich attack...");
-        
+
         // Implementation would include:
         // 1. Front-run transaction with buy order
         // 2. Wait for victim transaction to execute
         // 3. Back-run with sell order
         // 4. Calculate actual profit
-        
+
         // Simplified for demo
         Ok("sandwich_tx_123".to_string())
     }
-    
+
     /// Execute arbitrage opportunity
     async fn execute_arbitrage(&self, opportunity: MevOpportunity) -> Result<String> {
         info!("⚖️ Executing arbitrage opportunity...");
-        
+
         // Implementation would include:
         // 1. Simultaneous buy on low-price DEX
         // 2. Simultaneous sell on high-price DEX
         // 3. Account for slippage and fees
-        
+
         // Simplified for demo
         Ok("arbitrage_tx_456".to_string())
     }
-    
+
     /// Execute liquidation
     async fn execute_liquidation(&self, opportunity: MevOpportunity) -> Result<String> {
         info!("💥 Executing liquidation...");
-        
+
         // Implementation would include:
         // 1. Call liquidation function on lending protocol
         // 2. Receive liquidation bonus
         // 3. Manage received collateral
-        
+
         // Simplified for demo
         Ok("liquidation_tx_789".to_string())
     }
-    
+
     /// Get strategy statistics
     pub async fn get_statistics(&self) -> MevStatistics {
         let active_positions = self.active_positions.read().await;
-        
+
         let mut stats = MevStatistics::default();
-        
+
         for position in active_positions.values() {
             match position.strategy_type {
                 MevStrategyType::SandwichAttack => {
@@ -351,7 +358,7 @@ impl AdvancedMevStrategy {
                 }
             }
         }
-        
+
         stats
     }
 }
@@ -379,15 +386,24 @@ impl SandwichDetector {
     }
 
     /// Detect sandwich attack opportunity
-    pub async fn detect_opportunity(&self, tx: &ParsedTransaction) -> Result<Option<MevOpportunity>> {
+    pub async fn detect_opportunity(
+        &self,
+        tx: &ParsedTransaction,
+    ) -> Result<Option<MevOpportunity>> {
         // Check if transaction has DEX interactions
         for interaction in &tx.dex_interactions {
-            if matches!(interaction.instruction_type, crate::mempool::dex::InstructionType::Swap) {
+            if matches!(
+                interaction.instruction_type,
+                crate::mempool::dex::InstructionType::Swap
+            ) {
                 // Calculate potential profit from sandwich attack
                 let estimated_profit = self.calculate_sandwich_profit(1000000000, 100).await?; // Mock values
 
                 if estimated_profit >= self.config.min_sandwich_profit_sol {
-                    debug!("🥪 Sandwich opportunity detected: {} SOL profit", estimated_profit);
+                    debug!(
+                        "🥪 Sandwich opportunity detected: {} SOL profit",
+                        estimated_profit
+                    );
 
                     let signature_str = hex::encode(&tx.signature);
 
@@ -398,7 +414,11 @@ impl SandwichDetector {
                         estimated_profit_sol: estimated_profit,
                         confidence_score: 0.8,
                         time_sensitive: true,
-                        execution_deadline: std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_secs() + 10,
+                        execution_deadline: std::time::SystemTime::now()
+                            .duration_since(std::time::UNIX_EPOCH)
+                            .unwrap()
+                            .as_secs()
+                            + 10,
                     }));
                 }
             }
@@ -427,15 +447,24 @@ impl ArbitrageDetector {
     }
 
     /// Detect arbitrage opportunity
-    pub async fn detect_opportunity(&self, tx: &ParsedTransaction) -> Result<Option<MevOpportunity>> {
+    pub async fn detect_opportunity(
+        &self,
+        tx: &ParsedTransaction,
+    ) -> Result<Option<MevOpportunity>> {
         // Check if transaction affects token prices
         for interaction in &tx.dex_interactions {
-            if matches!(interaction.instruction_type, crate::mempool::dex::InstructionType::Swap) {
+            if matches!(
+                interaction.instruction_type,
+                crate::mempool::dex::InstructionType::Swap
+            ) {
                 // Look for price differences across DEXes
                 let price_difference = self.check_price_differences("USDC", "SOL").await?;
 
                 if price_difference >= self.config.min_arbitrage_profit_sol {
-                    debug!("⚖️ Arbitrage opportunity detected: {} SOL profit", price_difference);
+                    debug!(
+                        "⚖️ Arbitrage opportunity detected: {} SOL profit",
+                        price_difference
+                    );
 
                     let signature_str = hex::encode(&tx.signature);
 
@@ -446,7 +475,11 @@ impl ArbitrageDetector {
                         estimated_profit_sol: price_difference,
                         confidence_score: 0.9,
                         time_sensitive: true,
-                        execution_deadline: std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_secs() + 5,
+                        execution_deadline: std::time::SystemTime::now()
+                            .duration_since(std::time::UNIX_EPOCH)
+                            .unwrap()
+                            .as_secs()
+                            + 5,
                     }));
                 }
             }
@@ -477,12 +510,18 @@ impl LiquidationDetector {
     }
 
     /// Detect liquidation opportunity
-    pub async fn detect_opportunity(&self, tx: &ParsedTransaction) -> Result<Option<MevOpportunity>> {
+    pub async fn detect_opportunity(
+        &self,
+        tx: &ParsedTransaction,
+    ) -> Result<Option<MevOpportunity>> {
         // Check if transaction affects lending protocol positions
         if self.is_lending_protocol_transaction(tx) {
             // Check for undercollateralized positions
             if let Some(liquidation_profit) = self.check_liquidation_opportunities().await? {
-                debug!("💥 Liquidation opportunity detected: {} SOL profit", liquidation_profit);
+                debug!(
+                    "💥 Liquidation opportunity detected: {} SOL profit",
+                    liquidation_profit
+                );
 
                 let signature_str = hex::encode(&tx.signature);
 
@@ -493,7 +532,11 @@ impl LiquidationDetector {
                     estimated_profit_sol: liquidation_profit,
                     confidence_score: 0.95,
                     time_sensitive: false,
-                    execution_deadline: std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_secs() + 60,
+                    execution_deadline: std::time::SystemTime::now()
+                        .duration_since(std::time::UNIX_EPOCH)
+                        .unwrap()
+                        .as_secs()
+                        + 60,
                 }));
             }
         }

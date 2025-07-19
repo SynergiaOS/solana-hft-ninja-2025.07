@@ -1,25 +1,23 @@
+use crate::core::wallet::WalletManager;
+use anyhow::{anyhow, Context, Result};
 use solana_client::{
     rpc_client::RpcClient,
     rpc_config::{RpcSendTransactionConfig, RpcTransactionConfig},
-    rpc_request::RpcRequest,
-    rpc_response::{Response, RpcResult},
 };
 use solana_sdk::{
     commitment_config::{CommitmentConfig, CommitmentLevel},
+    hash::Hash,
+    message::Message,
     pubkey::Pubkey,
-    signature::{Signature, Signer},
+    signature::Signature,
     system_instruction,
     transaction::Transaction,
-    message::Message,
-    hash::Hash,
 };
-use solana_transaction_status::{TransactionStatus, UiTransactionEncoding};
-use anyhow::{Result, Context, anyhow};
-use std::time::{Duration, Instant};
+use solana_transaction_status::UiTransactionEncoding;
 use std::sync::Arc;
+use std::time::{Duration, Instant};
 use tokio::time::sleep;
-use tracing::{info, warn, error, debug};
-use crate::core::wallet::WalletManager;
+use tracing::{debug, info, warn};
 
 #[derive(Clone)]
 pub struct SolanaClient {
@@ -51,8 +49,11 @@ impl SolanaClient {
     pub fn new(rpc_url: &str, commitment: CommitmentLevel, timeout_ms: u64) -> Result<Self> {
         let commitment_config = CommitmentConfig { commitment };
         let timeout = Duration::from_millis(timeout_ms);
-        
-        let rpc_client = Arc::new(RpcClient::new_with_commitment(rpc_url.to_string(), commitment_config));
+
+        let rpc_client = Arc::new(RpcClient::new_with_commitment(
+            rpc_url.to_string(),
+            commitment_config,
+        ));
 
         info!("🌐 Solana client initialized: {}", rpc_url);
         info!("⚙️ Commitment level: {:?}", commitment);
@@ -82,19 +83,25 @@ impl SolanaClient {
     }
 
     pub async fn get_balance(&self, pubkey: &Pubkey) -> Result<u64> {
-        let balance = self.rpc_client
+        let balance = self
+            .rpc_client
             .get_balance_with_commitment(pubkey, self.commitment)
             .context("Failed to get balance")?
             .value;
-        
-        debug!("💰 Balance for {}: {} lamports ({:.6} SOL)", 
-               pubkey, balance, balance as f64 / 1_000_000_000.0);
-        
+
+        debug!(
+            "💰 Balance for {}: {} lamports ({:.6} SOL)",
+            pubkey,
+            balance,
+            balance as f64 / 1_000_000_000.0
+        );
+
         Ok(balance)
     }
 
     pub async fn get_account_info(&self, pubkey: &Pubkey) -> Result<AccountInfo> {
-        let account = self.rpc_client
+        let account = self
+            .rpc_client
             .get_account_with_commitment(pubkey, self.commitment)
             .context("Failed to get account info")?
             .value
@@ -114,10 +121,11 @@ impl SolanaClient {
     }
 
     pub async fn get_recent_blockhash(&self) -> Result<Hash> {
-        let (blockhash, _) = self.rpc_client
+        let (blockhash, _) = self
+            .rpc_client
             .get_latest_blockhash_with_commitment(self.commitment)
             .context("Failed to get recent blockhash")?;
-        
+
         debug!("🔗 Recent blockhash: {}", blockhash);
         Ok(blockhash)
     }
@@ -128,19 +136,19 @@ impl SolanaClient {
         instructions: Vec<solana_sdk::instruction::Instruction>,
     ) -> Result<TransactionResult> {
         let start_time = Instant::now();
-        
+
         // Get recent blockhash
         let recent_blockhash = self.get_recent_blockhash().await?;
-        
+
         // Create message
         let message = Message::new(&instructions, Some(&wallet.pubkey()));
-        
+
         // Create transaction
         let mut transaction = Transaction::new_unsigned(message);
         transaction.sign(&[wallet.keypair()], recent_blockhash);
-        
+
         info!("📤 Sending transaction: {}", transaction.signatures[0]);
-        
+
         // Send transaction
         let config = RpcSendTransactionConfig {
             skip_preflight: false,
@@ -149,18 +157,22 @@ impl SolanaClient {
             max_retries: Some(3),
             min_context_slot: None,
         };
-        
-        let signature = self.rpc_client
+
+        let signature = self
+            .rpc_client
             .send_transaction_with_config(&transaction, config)
             .context("Failed to send transaction")?;
-        
+
         // Wait for confirmation
         let confirmation_result = self.wait_for_confirmation(&signature).await?;
-        
+
         let execution_time = start_time.elapsed().as_millis() as u64;
-        
-        info!("✅ Transaction confirmed: {} ({}ms)", signature, execution_time);
-        
+
+        info!(
+            "✅ Transaction confirmed: {} ({}ms)",
+            signature, execution_time
+        );
+
         Ok(TransactionResult {
             signature,
             slot: confirmation_result.slot,
@@ -177,25 +189,27 @@ impl SolanaClient {
         amount_lamports: u64,
     ) -> Result<TransactionResult> {
         let instruction = system_instruction::transfer(&wallet.pubkey(), to, amount_lamports);
-        
-        info!("💸 Sending {} lamports ({:.6} SOL) from {} to {}", 
-              amount_lamports, 
-              amount_lamports as f64 / 1_000_000_000.0,
-              wallet.pubkey(), 
-              to);
-        
+
+        info!(
+            "💸 Sending {} lamports ({:.6} SOL) from {} to {}",
+            amount_lamports,
+            amount_lamports as f64 / 1_000_000_000.0,
+            wallet.pubkey(),
+            to
+        );
+
         self.send_transaction(wallet, vec![instruction]).await
     }
 
     async fn wait_for_confirmation(&self, signature: &Signature) -> Result<ConfirmationResult> {
         let start_time = Instant::now();
         let max_wait_time = Duration::from_secs(30);
-        
+
         loop {
             if start_time.elapsed() > max_wait_time {
                 return Err(anyhow!("Transaction confirmation timeout: {}", signature));
             }
-            
+
             match self.get_transaction_status(signature).await {
                 Ok(Some(status)) => {
                     if let Some(confirmation_status) = status.confirmation_status {
@@ -208,7 +222,10 @@ impl SolanaClient {
                                 });
                             }
                             "processed" => {
-                                debug!("⏳ Transaction processed, waiting for confirmation: {}", signature);
+                                debug!(
+                                    "⏳ Transaction processed, waiting for confirmation: {}",
+                                    signature
+                                );
                             }
                             _ => {
                                 warn!("❓ Unknown confirmation status: {}", confirmation_status);
@@ -223,32 +240,38 @@ impl SolanaClient {
                     warn!("⚠️ Error checking transaction status: {}", e);
                 }
             }
-            
+
             sleep(Duration::from_millis(500)).await;
         }
     }
 
-    async fn get_transaction_status(&self, signature: &Signature) -> Result<Option<TransactionStatusInfo>> {
+    async fn get_transaction_status(
+        &self,
+        signature: &Signature,
+    ) -> Result<Option<TransactionStatusInfo>> {
         let config = RpcTransactionConfig {
             encoding: Some(UiTransactionEncoding::Json),
             commitment: Some(self.commitment),
             max_supported_transaction_version: Some(0),
         };
-        
-        match self.rpc_client.get_transaction_with_config(signature, config) {
+
+        match self
+            .rpc_client
+            .get_transaction_with_config(signature, config)
+        {
             Ok(transaction) => {
                 let slot = transaction.slot;
                 let meta = transaction.transaction.meta.as_ref();
                 let fee_lamports = meta.map(|m| m.fee).unwrap_or(0);
-                
+
                 // Determine confirmation status based on slot and commitment
                 let confirmation_status = match self.commitment.commitment {
                     CommitmentLevel::Finalized => "finalized",
-                    CommitmentLevel::Confirmed => "confirmed", 
+                    CommitmentLevel::Confirmed => "confirmed",
                     CommitmentLevel::Processed => "processed",
                     _ => "confirmed",
                 };
-                
+
                 Ok(Some(TransactionStatusInfo {
                     slot,
                     confirmation_status: Some(confirmation_status.to_string()),
@@ -267,8 +290,9 @@ impl SolanaClient {
         let recent_blockhash = self.get_recent_blockhash().await?;
         let message = Message::new(&instructions, Some(&wallet.pubkey()));
         let transaction = Transaction::new_unsigned(message);
-        
-        let simulation = self.rpc_client
+
+        let simulation = self
+            .rpc_client
             .simulate_transaction_with_config(
                 &transaction,
                 solana_client::rpc_config::RpcSimulateTransactionConfig {
@@ -282,9 +306,9 @@ impl SolanaClient {
                 },
             )
             .context("Failed to simulate transaction")?;
-        
+
         let result = simulation.value;
-        
+
         Ok(SimulationResult {
             success: result.err.is_none(),
             error: result.err.map(|e| format!("{:?}", e)),

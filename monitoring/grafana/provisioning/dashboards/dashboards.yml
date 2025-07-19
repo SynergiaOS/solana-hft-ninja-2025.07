@@ -1,0 +1,49 @@
+# 🥷 Solana HFT Ninja 2025.07 - Grafana Dashboard Provisioning
+# Automatyczne ładowanie dashboardów przy starcie Grafana
+
+apiVersion: 1
+
+providers:
+  # Main HFT Ninja Dashboards
+  - name: 'hft-ninja-dashboards'
+    orgId: 1
+    folder: 'HFT Ninja'
+    type: file
+    disableDeletion: false
+    updateIntervalSeconds: 10
+    allowUiUpdates: true
+    options:
+      path: /etc/grafana/provisioning/dashboards/hft-ninja
+
+  # MEV Strategy Dashboards
+  - name: 'mev-strategy-dashboards'
+    orgId: 1
+    folder: 'MEV Strategies'
+    type: file
+    disableDeletion: false
+    updateIntervalSeconds: 10
+    allowUiUpdates: true
+    options:
+      path: /etc/grafana/provisioning/dashboards/mev-strategies
+
+  # Security & Monitoring Dashboards
+  - name: 'security-dashboards'
+    orgId: 1
+    folder: 'Security'
+    type: file
+    disableDeletion: false
+    updateIntervalSeconds: 10
+    allowUiUpdates: true
+    options:
+      path: /etc/grafana/provisioning/dashboards/security
+
+  # System Performance Dashboards
+  - name: 'system-dashboards'
+    orgId: 1
+    folder: 'System'
+    type: file
+    disableDeletion: false
+    updateIntervalSeconds: 10
+    allowUiUpdates: true
+    options:
+      path: /etc/grafana/provisioning/dashboards/system

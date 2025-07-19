@@ -1,8 +1,8 @@
 // 🥷 API Types - Request/Response Structures
 // Type definitions for API communication
 
-use serde::{Deserialize, Serialize};
 use crate::core::types::*;
+use serde::{Deserialize, Serialize};
 
 /// API response wrapper
 #[derive(Debug, Serialize, Deserialize)]
@@ -22,7 +22,7 @@ impl<T> ApiResponse<T> {
             timestamp: current_timestamp(),
         }
     }
-    
+
     pub fn error(message: String) -> Self {
         Self {
             success: false,

@@ -1,12 +1,10 @@
 //! Transaction parsing and analysis
 
-use solana_sdk::{
-    message::VersionedMessage,
-    pubkey::Pubkey,
-    transaction::VersionedTransaction,
-    signature::Signature,
-};
 use serde::{Deserialize, Serialize};
+use solana_sdk::{
+    message::VersionedMessage, pubkey::Pubkey,
+    transaction::VersionedTransaction,
+};
 
 use crate::mempool::{dex::*, error::*, metrics::MempoolMetrics};
 
@@ -38,7 +36,8 @@ mod signature_serde {
         D: Deserializer<'de>,
     {
         let vec = Vec::<u8>::deserialize(deserializer)?;
-        vec.try_into().map_err(|_| serde::de::Error::custom("Invalid signature length"))
+        vec.try_into()
+            .map_err(|_| serde::de::Error::custom("Invalid signature length"))
     }
 }
 
@@ -51,6 +50,7 @@ pub struct ParsedInstruction {
 }
 
 /// Transaction parser
+#[derive(Clone)]
 pub struct ZeroCopyParser {
     metrics: MempoolMetrics,
     max_memory_bytes: usize,
@@ -75,11 +75,19 @@ impl ZeroCopyParser {
 
         // Check memory limit
         if data.len() > self.max_memory_bytes {
-            return Err(MempoolError::MemoryLimitExceeded(self.max_memory_bytes / 1024 / 1024));
+            return Err(MempoolError::MemoryLimitExceeded(
+                self.max_memory_bytes / 1024 / 1024,
+            ));
         }
 
         // Deserialize transaction
-        let transaction = self.deserialize_transaction(data)?;
+        let transaction = match self.deserialize_transaction(data) {
+            Ok(tx) => tx,
+            Err(e) => {
+                self.metrics.increment_deserialization_errors();
+                return Err(e);
+            }
+        };
 
         // Extract account keys and instructions
         let account_keys = self.extract_account_keys(&transaction)?;
@@ -89,10 +97,7 @@ impl ZeroCopyParser {
         let compiled_instructions = self.get_compiled_instructions(&transaction);
 
         // Detect DEX interactions
-        let dex_interactions = detect_dex_interactions(
-            &compiled_instructions,
-            &account_keys,
-        );
+        let dex_interactions = detect_dex_interactions(&compiled_instructions, &account_keys);
 
         // Update metrics
         self.metrics.increment_transactions_processed();
@@ -103,7 +108,10 @@ impl ZeroCopyParser {
         }
 
         Ok(ParsedTransaction {
-            signature: transaction.signatures[0].as_ref().try_into().unwrap_or([0u8; 64]),
+            signature: transaction.signatures[0]
+                .as_ref()
+                .try_into()
+                .unwrap_or([0u8; 64]),
             account_keys,
             instructions,
             dex_interactions,
@@ -131,7 +139,10 @@ impl ZeroCopyParser {
     }
 
     /// Extract instructions from transaction
-    fn extract_instructions(&self, transaction: &VersionedTransaction) -> Result<Vec<ParsedInstruction>> {
+    fn extract_instructions(
+        &self,
+        transaction: &VersionedTransaction,
+    ) -> Result<Vec<ParsedInstruction>> {
         let instructions = match &transaction.message {
             VersionedMessage::Legacy(message) => &message.instructions,
             VersionedMessage::V0(message) => &message.instructions,
@@ -148,7 +159,10 @@ impl ZeroCopyParser {
     }
 
     /// Get compiled instructions for DEX detection
-    fn get_compiled_instructions(&self, transaction: &VersionedTransaction) -> Vec<solana_sdk::instruction::CompiledInstruction> {
+    fn get_compiled_instructions(
+        &self,
+        transaction: &VersionedTransaction,
+    ) -> Vec<solana_sdk::instruction::CompiledInstruction> {
         match &transaction.message {
             VersionedMessage::Legacy(message) => message.instructions.clone(),
             VersionedMessage::V0(message) => message.instructions.clone(),
@@ -188,7 +202,8 @@ impl TransactionBuffer {
     pub fn push(&mut self, data: &[u8]) -> Result<()> {
         if self.buffer.len() + data.len() > self.capacity {
             // Remove oldest transactions (simple FIFO)
-            let remove_amount = (self.buffer.len() + data.len() - self.capacity).min(self.buffer.len());
+            let remove_amount =
+                (self.buffer.len() + data.len() - self.capacity).min(self.buffer.len());
             self.buffer.drain(0..remove_amount);
         }
 
@@ -213,9 +228,9 @@ impl TransactionBuffer {
 mod tests {
     use super::*;
     use solana_sdk::{
-        message::{Message, VersionedMessage},
         signature::Keypair,
         signer::Signer,
+        system_instruction,
         transaction::Transaction,
     };
 
@@ -224,17 +239,28 @@ mod tests {
         let metrics = MempoolMetrics::new();
         let parser = ZeroCopyParser::new(metrics, 16 * 1024 * 1024);
 
-        // Create a simple transaction for testing
+        // Create a simple transaction for testing with valid instruction
         let keypair = Keypair::new();
-        let message = Message::new(&[], None);
-        let transaction = Transaction::new(&[&keypair], message, Default::default());
+        // Create a transfer instruction (0 lamports to self) - minimal valid transaction
+        let instruction = system_instruction::transfer(
+            &keypair.pubkey(),
+            &keypair.pubkey(),
+            0, // 0 lamports transfer to self
+        );
+        let recent_blockhash = solana_sdk::hash::Hash::default();
+        let transaction = Transaction::new_signed_with_payer(
+            &[instruction],
+            Some(&keypair.pubkey()),
+            &[&keypair],
+            recent_blockhash,
+        );
         let versioned = VersionedTransaction::from(transaction);
 
         let serialized = bincode::serialize(&versioned).unwrap();
         let parsed = parser.parse_transaction(&serialized, 0, 0).unwrap();
 
         assert!(!parsed.account_keys.is_empty());
-        assert_eq!(parsed.instructions.len(), 0);
+        assert_eq!(parsed.instructions.len(), 1); // Now we have 1 transfer instruction
     }
 
     #[test]
@@ -244,19 +270,19 @@ mod tests {
 
         let large_data = vec![0u8; 2048];
         let result = parser.parse_transaction(&large_data, 0, 0);
-        
-        assert!(matches!(result, Err(MempoolError::MemoryLimitExceeded(1))));
+
+        assert!(matches!(result, Err(MempoolError::MemoryLimitExceeded(0))));
     }
 
     #[test]
     fn test_transaction_buffer() {
         let mut buffer = TransactionBuffer::new(100);
-        
+
         buffer.push(&[1, 2, 3]).unwrap();
         buffer.push(&[4, 5, 6]).unwrap();
-        
+
         assert_eq!(buffer.len(), 6);
-        
+
         // Test overflow handling
         buffer.push(&[7; 100]).unwrap();
         assert!(buffer.len() <= 100);

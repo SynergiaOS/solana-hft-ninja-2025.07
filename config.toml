@@ -1,0 +1,91 @@
+# Solana HFT Ninja 2025.07 Configuration
+
+[solana]
+# RPC Configuration - Devnet for testing
+rpc_url = "https://api.devnet.solana.com"
+ws_url = "wss://api.devnet.solana.com"
+rpc_timeout_ms = 5000
+commitment = "confirmed"
+
+[helius]
+# Helius API Configuration - DEVNET for testing
+api_key = ""  # Set via HELIUS_API_KEY environment variable
+rpc_url = "https://devnet.helius-rpc.com"
+ws_url = "wss://devnet.helius-rpc.com"
+enable_enhanced_transactions = true
+enable_account_webhooks = false
+
+[trading]
+# Trading Parameters
+initial_balance_sol = 1.0
+max_position_size_sol = 0.1
+max_slippage_bps = 50
+min_profit_threshold_bps = 25
+risk_limit_bps = 500
+dry_run = false
+
+[strategy]
+# Strategy Configuration
+strategy_mode = "market_making"  # Options: market_making, arbitrage, mev_basic
+update_interval_ms = 100
+order_book_depth = 20
+spread_bps = 25
+
+[mev]
+# MEV Strategy Configuration
+sandwich_enabled = false
+arbitrage_enabled = true
+token_launch_enabled = false
+min_sandwich_amount = 10000  # 0.01 SOL in lamports
+min_arbitrage_profit_bps = 50
+max_sandwich_slippage_bps = 300
+
+[jito]
+# Jito Bundle Configuration
+enabled = false
+tip_account = "96gYZGLnJYVFmbjzopPSU6QiEV5fGqZNyN9nmNhvrZU5"
+max_tip_lamports = 100000
+bundle_timeout_ms = 5000
+max_retries = 3
+
+[risk_management]
+# Risk Management
+stop_loss_bps = 200
+take_profit_bps = 300
+max_daily_loss_sol = 0.5
+max_open_positions = 10
+position_timeout_seconds = 300
+
+[risk]
+# Risk Management Configuration
+stop_loss_bps = 200
+take_profit_bps = 300
+max_drawdown_bps = 500
+risk_limit_bps = 1000
+
+[logging]
+# Logging Configuration
+rust_log = "info"
+log_level = "info"
+log_file_path = "logs/hft.log"
+
+[monitoring]
+# Monitoring Configuration
+metrics_port = 8080
+health_check_interval_ms = 10000
+enable_ddos_protection = false
+rate_limit_rps = 5000
+enable_grafana = true
+
+[dex]
+# DEX Configuration
+raydium_enabled = true
+orca_enabled = true
+jupiter_enabled = true
+serum_enabled = false
+
+[wallet]
+# Wallet Configuration (use environment variables for security)
+# WALLET_PRIVATE_KEY environment variable should contain base58 private key
+private_key_path = "./config/wallet.json"  # Path to private key file
+keypair_path = "./config/wallet.json"  # Path to keypair file

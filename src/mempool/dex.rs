@@ -5,26 +5,26 @@ use std::str::FromStr;
 
 /// DEX program IDs on Solana
 pub mod program_ids {
-    use super::*;
     
+
     /// Raydium AMM V4
     pub const RAYDIUM_AMM_V4: &str = "675kPX9MHTjS2zt1qfr1NYHuzeLXfQM9H24wFSUt1Mp8";
-    
+
     /// Raydium Concentrated Liquidity
     pub const RAYDIUM_CLMM: &str = "CAMMCzo5YL8w4VFF8KVHrK22GGUsp5VTaW7grrKgrWqK";
-    
+
     /// Orca Whirlpool
     pub const ORCA_WHIRLPOOL: &str = "whirLbMiicVdio4qvUfM5KAg6Ct8VwpYzGff3uctyCc";
-    
+
     /// Orca Aquafarm
     pub const ORCA_AQUAFARM: &str = "82yxjeMsvaURa4MbZZ7WZZHfobirZYkH1zF8fmeGtyaQ";
-    
+
     /// Jupiter V6
     pub const JUPITER_V6: &str = "JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZoi5QNyVTaV4";
-    
+
     /// Jupiter Limit Order
     pub const JUPITER_LIMIT_ORDER: &str = "j1o2qRpjcyUwEvwtcfhEQefh773ZgjxcVRry7LDqg5X";
-    
+
     /// Jupiter DCA
     pub const JUPITER_DCA: &str = "DCA265Vj8a9CEuX1eb1LWRnDT7uK6q1xMipnNyatn23M";
 }
@@ -45,7 +45,7 @@ pub enum DexProgram {
 impl DexProgram {
     pub fn from_pubkey(pubkey: &Pubkey) -> Self {
         let pubkey_str = pubkey.to_string();
-        
+
         match pubkey_str.as_str() {
             program_ids::RAYDIUM_AMM_V4 => DexProgram::RaydiumAmm,
             program_ids::RAYDIUM_CLMM => DexProgram::RaydiumClmm,
@@ -121,10 +121,10 @@ pub fn detect_dex_interactions(
     for instruction in instructions {
         if let Some(program_id) = account_keys.get(instruction.program_id_index as usize) {
             let dex_program = DexProgram::from_pubkey(program_id);
-            
+
             if dex_program.is_known_dex() {
                 let instruction_type = parse_instruction_type(&instruction.data, &dex_program);
-                
+
                 let accounts: Vec<Pubkey> = instruction
                     .accounts
                     .iter()
@@ -148,7 +148,7 @@ pub fn detect_dex_interactions(
 }
 
 /// Parse instruction type from instruction data
-fn parse_instruction_type(data: &[u8], dex: &DexProgram) -> InstructionType {
+pub fn parse_instruction_type(data: &[u8], dex: &DexProgram) -> InstructionType {
     if data.is_empty() {
         return InstructionType::Unknown;
     }
@@ -231,16 +231,28 @@ mod tests {
     #[test]
     fn test_dex_program_detection() {
         let raydium_pubkey = Pubkey::from_str(program_ids::RAYDIUM_AMM_V4).unwrap();
-        assert_eq!(DexProgram::from_pubkey(&raydium_pubkey), DexProgram::RaydiumAmm);
+        assert_eq!(
+            DexProgram::from_pubkey(&raydium_pubkey),
+            DexProgram::RaydiumAmm
+        );
 
         let orca_pubkey = Pubkey::from_str(program_ids::ORCA_WHIRLPOOL).unwrap();
-        assert_eq!(DexProgram::from_pubkey(&orca_pubkey), DexProgram::OrcaWhirlpool);
+        assert_eq!(
+            DexProgram::from_pubkey(&orca_pubkey),
+            DexProgram::OrcaWhirlpool
+        );
 
         let jupiter_pubkey = Pubkey::from_str(program_ids::JUPITER_V6).unwrap();
-        assert_eq!(DexProgram::from_pubkey(&jupiter_pubkey), DexProgram::JupiterV6);
+        assert_eq!(
+            DexProgram::from_pubkey(&jupiter_pubkey),
+            DexProgram::JupiterV6
+        );
 
         let unknown_pubkey = Pubkey::new_unique();
-        assert_eq!(DexProgram::from_pubkey(&unknown_pubkey), DexProgram::Unknown);
+        assert_eq!(
+            DexProgram::from_pubkey(&unknown_pubkey),
+            DexProgram::Unknown
+        );
     }
 
     #[test]

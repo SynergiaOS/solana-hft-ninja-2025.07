@@ -1,5 +1,5 @@
 //! Access Control Module
-//! 
+//!
 //! Authentication, authorization, and session management
 
 use anyhow::Result;
@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::RwLock;
-use tracing::{info, warn, error, debug};
+use tracing::{debug, error, info, warn};
 
 use super::SecurityConfig;
 
@@ -76,17 +76,19 @@ impl AccessControl {
     /// Create new access control manager
     pub fn new(config: &SecurityConfig) -> Result<Self> {
         info!("🔐 Initializing Access Control...");
-        
+
         let sessions = Arc::new(RwLock::new(HashMap::new()));
         let users = Arc::new(RwLock::new(HashMap::<String, User>::new()));
-        let rate_limiter = Arc::new(RwLock::new(RateLimiter::new(config.api_rate_limit_per_minute)));
-        
+        let rate_limiter = Arc::new(RwLock::new(RateLimiter::new(
+            config.api_rate_limit_per_minute,
+        )));
+
         // Create default admin user
         let mut users_map = HashMap::new();
         users_map.insert("admin".to_string(), User::create_admin());
-        
+
         info!("✅ Access Control initialized");
-        
+
         Ok(Self {
             config: config.clone(),
             sessions,
@@ -94,43 +96,56 @@ impl AccessControl {
             rate_limiter,
         })
     }
-    
+
     /// Authenticate user and create session
-    pub async fn authenticate(&self, username: &str, password: &str, ip_address: &str) -> Result<Option<String>> {
+    pub async fn authenticate(
+        &self,
+        username: &str,
+        password: &str,
+        ip_address: &str,
+    ) -> Result<Option<String>> {
         // Check rate limiting
         if !self.check_rate_limit(ip_address).await? {
             warn!("🚨 Rate limit exceeded for IP: {}", ip_address);
             return Ok(None);
         }
-        
+
         let mut users = self.users.write().await;
-        
+
         if let Some(user) = users.get_mut(username) {
             if user.locked {
                 warn!("🔒 User {} is locked", username);
                 return Ok(None);
             }
-            
+
             // Simplified password check - in production use proper hashing
             if self.verify_password(password, username) {
                 // Reset failed attempts
                 user.failed_login_attempts = 0;
-                user.last_login = Some(std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_secs());
-                
+                user.last_login = Some(
+                    std::time::SystemTime::now()
+                        .duration_since(std::time::UNIX_EPOCH)
+                        .unwrap()
+                        .as_secs(),
+                );
+
                 // Create session
                 let session_id = self.create_session(user, ip_address).await?;
-                
+
                 info!("✅ User {} authenticated successfully", username);
                 Ok(Some(session_id))
             } else {
                 // Increment failed attempts
                 user.failed_login_attempts += 1;
-                
+
                 if user.failed_login_attempts >= 3 {
                     user.locked = true;
-                    error!("🚨 User {} locked due to too many failed attempts", username);
+                    error!(
+                        "🚨 User {} locked due to too many failed attempts",
+                        username
+                    );
                 }
-                
+
                 warn!("❌ Authentication failed for user {}", username);
                 Ok(None)
             }
@@ -139,65 +154,87 @@ impl AccessControl {
             Ok(None)
         }
     }
-    
+
     /// Validate session and check permissions
-    pub async fn validate_session(&self, session_id: &str, required_permission: Permission) -> Result<bool> {
+    pub async fn validate_session(
+        &self,
+        session_id: &str,
+        required_permission: Permission,
+    ) -> Result<bool> {
         let sessions = self.sessions.read().await;
-        
+
         if let Some(session) = sessions.get(session_id) {
             // Check session timeout
-            let now = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_secs();
+            let now = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_secs();
             let timeout_seconds = self.config.session_timeout_minutes as u64 * 60;
-            
+
             if now - session.last_activity > timeout_seconds {
                 warn!("⏰ Session {} expired", session_id);
                 return Ok(false);
             }
-            
+
             // Check permission
             if session.permissions.contains(&required_permission) {
-                debug!("✅ Session {} has required permission {:?}", session_id, required_permission);
+                debug!(
+                    "✅ Session {} has required permission {:?}",
+                    session_id, required_permission
+                );
                 return Ok(true);
             } else {
-                warn!("🚫 Session {} lacks permission {:?}", session_id, required_permission);
+                warn!(
+                    "🚫 Session {} lacks permission {:?}",
+                    session_id, required_permission
+                );
                 return Ok(false);
             }
         }
-        
+
         warn!("❌ Invalid session: {}", session_id);
         Ok(false)
     }
-    
+
     /// Update session activity
     pub async fn update_session_activity(&self, session_id: &str) -> Result<()> {
         let mut sessions = self.sessions.write().await;
-        
+
         if let Some(session) = sessions.get_mut(session_id) {
-            session.last_activity = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_secs();
+            session.last_activity = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_secs();
         }
-        
+
         Ok(())
     }
-    
+
     /// Logout and invalidate session
     pub async fn logout(&self, session_id: &str) -> Result<()> {
         let mut sessions = self.sessions.write().await;
-        
+
         if sessions.remove(session_id).is_some() {
             info!("👋 Session {} logged out", session_id);
         }
-        
+
         Ok(())
     }
-    
+
     /// Check rate limiting
     async fn check_rate_limit(&self, ip_address: &str) -> Result<bool> {
         let mut rate_limiter = self.rate_limiter.write().await;
-        let now = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_secs();
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_secs();
         let limit = rate_limiter.limit_per_minute;
 
         // Clean old requests (older than 1 minute)
-        let requests = rate_limiter.requests.entry(ip_address.to_string()).or_insert_with(Vec::new);
+        let requests = rate_limiter
+            .requests
+            .entry(ip_address.to_string())
+            .or_insert_with(Vec::new);
         requests.retain(|&timestamp| now - timestamp < 60);
 
         // Check if under limit
@@ -208,12 +245,15 @@ impl AccessControl {
             Ok(false)
         }
     }
-    
+
     /// Create new session
     async fn create_session(&self, user: &User, ip_address: &str) -> Result<String> {
         let session_id = format!("sess_{}", uuid::Uuid::new_v4());
-        let now = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_secs();
-        
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_secs();
+
         let session = Session {
             session_id: session_id.clone(),
             user_id: user.user_id.clone(),
@@ -223,13 +263,13 @@ impl AccessControl {
             user_agent: None,
             permissions: user.permissions.clone(),
         };
-        
+
         let mut sessions = self.sessions.write().await;
         sessions.insert(session_id.clone(), session);
-        
+
         Ok(session_id)
     }
-    
+
     /// Verify password (simplified)
     fn verify_password(&self, password: &str, username: &str) -> bool {
         // In production, use proper password hashing (bcrypt, argon2, etc.)
@@ -239,12 +279,12 @@ impl AccessControl {
             _ => false,
         }
     }
-    
+
     /// Get access control statistics
     pub async fn get_access_stats(&self) -> AccessStats {
         let sessions = self.sessions.read().await;
         let users = self.users.read().await;
-        
+
         AccessStats {
             active_sessions: sessions.len() as u32,
             total_users: users.len() as u32,
@@ -270,7 +310,10 @@ impl User {
                 Permission::ManageUsers,
                 Permission::ViewMetrics,
             ],
-            created_at: std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_secs(),
+            created_at: std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_secs(),
             last_login: None,
             failed_login_attempts: 0,
             locked: false,

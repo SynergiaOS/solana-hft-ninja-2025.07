@@ -1,13 +1,15 @@
 // 🥷 Core Types - Zero-Copy, High-Performance Data Structures
 // Optimized for sub-millisecond trading operations
 
+use bytemuck::{Pod, Zeroable};
 use serde::{Deserialize, Serialize};
 use std::time::{SystemTime, UNIX_EPOCH};
-use bytemuck::{Pod, Zeroable};
 
 /// High-precision price representation (fixed-point arithmetic)
 /// Uses 64-bit integer for sub-penny precision without floating-point errors
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Pod, Zeroable, Serialize, Deserialize)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Pod, Zeroable, Serialize, Deserialize,
+)]
 #[repr(C)]
 pub struct Price {
     /// Price in micro-units (1 SOL = 1,000,000 micro-SOL)
@@ -16,17 +18,17 @@ pub struct Price {
 
 impl Price {
     pub const PRECISION: u64 = 1_000_000;
-    
+
     pub fn from_sol(sol: f64) -> Self {
         Self {
             micro_units: (sol * Self::PRECISION as f64) as u64,
         }
     }
-    
+
     pub fn to_sol(&self) -> f64 {
         self.micro_units as f64 / Self::PRECISION as f64
     }
-    
+
     pub fn zero() -> Self {
         Self { micro_units: 0 }
     }
@@ -61,15 +63,15 @@ impl OrderBook {
             sequence: 0,
         }
     }
-    
+
     pub fn best_bid(&self) -> Option<Price> {
         self.bids.first().map(|entry| entry.price)
     }
-    
+
     pub fn best_ask(&self) -> Option<Price> {
         self.asks.first().map(|entry| entry.price)
     }
-    
+
     pub fn spread(&self) -> Option<Price> {
         match (self.best_bid(), self.best_ask()) {
             (Some(bid), Some(ask)) => Some(Price {
@@ -123,15 +125,19 @@ impl Position {
             last_update: current_timestamp(),
         }
     }
-    
+
     pub fn update_unrealized_pnl(&mut self, current_price: Price) {
         if self.quantity != 0 {
             let price_diff = if self.quantity > 0 {
-                current_price.micro_units.saturating_sub(self.average_price.micro_units)
+                current_price
+                    .micro_units
+                    .saturating_sub(self.average_price.micro_units)
             } else {
-                self.average_price.micro_units.saturating_sub(current_price.micro_units)
+                self.average_price
+                    .micro_units
+                    .saturating_sub(current_price.micro_units)
             };
-            
+
             self.unrealized_pnl = Price {
                 micro_units: (price_diff * self.quantity.abs() as u64),
             };
@@ -199,12 +205,12 @@ pub enum SignalAction {
 /// Risk metrics for position management
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RiskMetrics {
-    pub var_95: Price,        // Value at Risk (95% confidence)
-    pub var_99: Price,        // Value at Risk (99% confidence)
-    pub max_drawdown: Price,  // Maximum drawdown
-    pub sharpe_ratio: f64,    // Risk-adjusted return
-    pub volatility: f64,      // Price volatility
-    pub beta: f64,            // Market correlation
+    pub var_95: Price,       // Value at Risk (95% confidence)
+    pub var_99: Price,       // Value at Risk (99% confidence)
+    pub max_drawdown: Price, // Maximum drawdown
+    pub sharpe_ratio: f64,   // Risk-adjusted return
+    pub volatility: f64,     // Price volatility
+    pub beta: f64,           // Market correlation
     pub last_update: u64,
 }
 
@@ -271,7 +277,7 @@ mod tests {
     fn test_price_precision() {
         let price = Price::from_sol(23.456789);
         assert_eq!(price.to_sol(), 23.456789);
-        
+
         let zero = Price::zero();
         assert_eq!(zero.to_sol(), 0.0);
     }
@@ -279,19 +285,19 @@ mod tests {
     #[test]
     fn test_order_book() {
         let mut book = OrderBook::new(1);
-        
+
         book.bids.push(OrderBookEntry {
             price: Price::from_sol(23.45),
             quantity: 100,
             timestamp: current_timestamp(),
         });
-        
+
         book.asks.push(OrderBookEntry {
             price: Price::from_sol(23.50),
             quantity: 150,
             timestamp: current_timestamp(),
         });
-        
+
         assert_eq!(book.best_bid().unwrap().to_sol(), 23.45);
         assert_eq!(book.best_ask().unwrap().to_sol(), 23.50);
         assert_eq!(book.spread().unwrap().to_sol(), 0.05);
@@ -302,7 +308,7 @@ mod tests {
         let mut position = Position::new(1);
         position.quantity = 100;
         position.average_price = Price::from_sol(23.00);
-        
+
         position.update_unrealized_pnl(Price::from_sol(23.50));
         assert_eq!(position.unrealized_pnl.to_sol(), 50.0);
     }

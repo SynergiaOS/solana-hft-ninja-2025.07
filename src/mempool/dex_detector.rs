@@ -1,14 +1,13 @@
 //! DEX Detection Engine
-//! 
+//!
 //! Advanced detection and parsing of DEX transactions across multiple protocols
 
-use anyhow::{Result, Context};
+use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use solana_sdk::pubkey::Pubkey;
 use std::collections::HashMap;
 use std::str::FromStr;
-use tracing::{debug, warn};
+use tracing::debug;
 
 /// Supported DEX protocols
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -27,7 +26,7 @@ pub enum DexProtocol {
 
 impl FromStr for DexProtocol {
     type Err = ();
-    
+
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s.to_lowercase().as_str() {
             "raydium" => Ok(DexProtocol::Raydium),
@@ -93,31 +92,61 @@ pub struct DexProgramIds {
 impl Default for DexProgramIds {
     fn default() -> Self {
         let mut programs = HashMap::new();
-        
+
         // Raydium
-        programs.insert("675kPX9MHTjS2zt1qfr1NYHuzeLXfQM9H24wFSUt1Mp8".to_string(), DexProtocol::Raydium);
-        programs.insert("5quBtoiQqxF9Jv6KYKctB59NT3gtJD2Y65kdnB1Uev3h".to_string(), DexProtocol::Raydium);
-        
+        programs.insert(
+            "675kPX9MHTjS2zt1qfr1NYHuzeLXfQM9H24wFSUt1Mp8".to_string(),
+            DexProtocol::Raydium,
+        );
+        programs.insert(
+            "5quBtoiQqxF9Jv6KYKctB59NT3gtJD2Y65kdnB1Uev3h".to_string(),
+            DexProtocol::Raydium,
+        );
+
         // Orca
-        programs.insert("9W959DqEETiGZocYWCQPaJ6sBmUzgfxXfqGeTEdp3aQP".to_string(), DexProtocol::Orca);
-        programs.insert("DjVE6JNiYqPL2QXyCUUh8rNjHrbz9hXHNYt99MQ59qw1".to_string(), DexProtocol::Orca);
-        
+        programs.insert(
+            "9W959DqEETiGZocYWCQPaJ6sBmUzgfxXfqGeTEdp3aQP".to_string(),
+            DexProtocol::Orca,
+        );
+        programs.insert(
+            "DjVE6JNiYqPL2QXyCUUh8rNjHrbz9hXHNYt99MQ59qw1".to_string(),
+            DexProtocol::Orca,
+        );
+
         // Jupiter
-        programs.insert("JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZoi5QNyVTaV4".to_string(), DexProtocol::Jupiter);
-        programs.insert("JUP4Fb2cqiRUcaTHdrPC8h2gNsA2ETXiPDD33WcGuJB".to_string(), DexProtocol::Jupiter);
-        
+        programs.insert(
+            "JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZoi5QNyVTaV4".to_string(),
+            DexProtocol::Jupiter,
+        );
+        programs.insert(
+            "JUP4Fb2cqiRUcaTHdrPC8h2gNsA2ETXiPDD33WcGuJB".to_string(),
+            DexProtocol::Jupiter,
+        );
+
         // Pump.fun
-        programs.insert("6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P".to_string(), DexProtocol::PumpFun);
-        
+        programs.insert(
+            "6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P".to_string(),
+            DexProtocol::PumpFun,
+        );
+
         // Serum
-        programs.insert("9xQeWvG816bUx9EPjHmaT23yvVM2ZWbrrpZb9PusVFin".to_string(), DexProtocol::Serum);
-        
+        programs.insert(
+            "9xQeWvG816bUx9EPjHmaT23yvVM2ZWbrrpZb9PusVFin".to_string(),
+            DexProtocol::Serum,
+        );
+
         // Meteora
-        programs.insert("Eo7WjKq67rjJQSZxS6z3YkapzY3eMj6Xy8X5EQVn5UaB".to_string(), DexProtocol::Meteora);
-        
+        programs.insert(
+            "Eo7WjKq67rjJQSZxS6z3YkapzY3eMj6Xy8X5EQVn5UaB".to_string(),
+            DexProtocol::Meteora,
+        );
+
         // Lifinity
-        programs.insert("EewxydAPCCVuNEyrVN68PuSYdQ7wKn27V9Gjeoi8dy3S".to_string(), DexProtocol::Lifinity);
-        
+        programs.insert(
+            "EewxydAPCCVuNEyrVN68PuSYdQ7wKn27V9Gjeoi8dy3S".to_string(),
+            DexProtocol::Lifinity,
+        );
+
         Self { programs }
     }
 }
@@ -127,7 +156,7 @@ impl DexProgramIds {
     pub fn get_protocol(&self, program_id: &str) -> Option<&DexProtocol> {
         self.programs.get(program_id)
     }
-    
+
     /// Check if program ID is a known DEX
     pub fn is_dex_program(&self, program_id: &str) -> bool {
         self.programs.contains_key(program_id)
@@ -152,7 +181,7 @@ impl DexDetector {
             program_ids: DexProgramIds::default(),
         }
     }
-    
+
     /// Detect if transaction is a DEX transaction
     pub fn detect_dex_transaction(&self, transaction: &Value) -> Option<DexTransaction> {
         // Extract transaction data
@@ -160,18 +189,18 @@ impl DexDetector {
         let message = tx_data.get("message")?.as_object()?;
         let instructions = message.get("instructions")?.as_array()?;
         let account_keys = message.get("accountKeys")?.as_array()?;
-        
+
         // Check each instruction for DEX programs
         for instruction in instructions {
             let inst_obj = instruction.as_object()?;
             let program_id_index = inst_obj.get("programIdIndex")?.as_u64()? as usize;
-            
+
             if program_id_index >= account_keys.len() {
                 continue;
             }
-            
+
             let program_id = account_keys[program_id_index].as_str()?;
-            
+
             if let Some(protocol) = self.program_ids.get_protocol(program_id) {
                 // Found DEX transaction, parse it
                 if let Some(dex_tx) = self.parse_dex_transaction(protocol, instruction, tx_data) {
@@ -179,10 +208,10 @@ impl DexDetector {
                 }
             }
         }
-        
+
         None
     }
-    
+
     /// Parse DEX transaction details
     fn parse_dex_transaction(
         &self,
@@ -190,17 +219,18 @@ impl DexDetector {
         instruction: &Value,
         tx_data: &serde_json::Map<String, Value>,
     ) -> Option<DexTransaction> {
-        let signature = tx_data.get("signatures")?
+        let signature = tx_data
+            .get("signatures")?
             .as_array()?
             .first()?
             .as_str()?
             .to_string();
-        
+
         // Extract basic transaction info
         let slot = 0; // Would be extracted from block data
         let block_time = None; // Would be extracted from block data
         let user = "unknown".to_string(); // Would be extracted from accounts
-        
+
         // Parse instruction data based on protocol
         let transaction_type = match protocol {
             DexProtocol::Raydium => self.parse_raydium_instruction(instruction)?,
@@ -212,7 +242,7 @@ impl DexDetector {
                 return None;
             }
         };
-        
+
         Some(DexTransaction {
             signature,
             protocol: protocol.clone(),
@@ -224,12 +254,12 @@ impl DexDetector {
             compute_units: None,
         })
     }
-    
+
     /// Parse Raydium instruction
     fn parse_raydium_instruction(&self, instruction: &Value) -> Option<DexTransactionType> {
         // Simplified parsing - in reality would decode instruction data
         let data = instruction.get("data")?.as_str()?;
-        
+
         // Basic swap detection (would need proper instruction decoding)
         if data.starts_with("swap") || data.len() > 32 {
             Some(DexTransactionType::Swap {
@@ -243,12 +273,12 @@ impl DexDetector {
             None
         }
     }
-    
+
     /// Parse Orca instruction
     fn parse_orca_instruction(&self, instruction: &Value) -> Option<DexTransactionType> {
         // Similar to Raydium but with Orca-specific logic
         let data = instruction.get("data")?.as_str()?;
-        
+
         if data.len() > 16 {
             Some(DexTransactionType::Swap {
                 amount_in: 500000,
@@ -261,12 +291,12 @@ impl DexDetector {
             None
         }
     }
-    
+
     /// Parse Jupiter instruction
     fn parse_jupiter_instruction(&self, instruction: &Value) -> Option<DexTransactionType> {
         // Jupiter aggregator parsing
         let data = instruction.get("data")?.as_str()?;
-        
+
         if data.len() > 20 {
             Some(DexTransactionType::Swap {
                 amount_in: 2000000,
@@ -279,19 +309,19 @@ impl DexDetector {
             None
         }
     }
-    
+
     /// Parse Pump.fun instruction
     fn parse_pumpfun_instruction(&self, instruction: &Value) -> Option<DexTransactionType> {
         // Pump.fun meme token trading
         let data = instruction.get("data")?.as_str()?;
-        
+
         if data.len() > 8 {
             Some(DexTransactionType::Swap {
                 amount_in: 100000,
                 amount_out: 95000,
                 token_in: "So11111111111111111111111111111111111111112".to_string(),
                 token_out: "meme_token_mint".to_string(), // Would be actual token mint
-                slippage_bps: Some(500), // Higher slippage for meme tokens
+                slippage_bps: Some(500),                  // Higher slippage for meme tokens
             })
         } else {
             None

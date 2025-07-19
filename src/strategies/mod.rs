@@ -1,22 +1,25 @@
 //! Trading Strategies Module
-//! 
+//!
 //! Advanced trading strategies for Solana HFT system
 
-pub mod mev;
 pub mod advanced_mev;
-pub mod protocol_specific;
 pub mod jupiter_arb;
+pub mod mev;
+pub mod protocol_specific;
 pub mod wallet_tracker;
 
-pub use mev::{MevEngine, MevOpportunity, MevConfig, MevStats, create_mev_engine, create_mev_engine_with_config};
 pub use advanced_mev::AdvancedMevStrategy;
+pub use jupiter_arb::{JupiterArbConfig, JupiterArbOpportunity, JupiterArbStrategy};
+pub use mev::{
+    create_mev_engine, create_mev_engine_with_config, MevConfig, MevEngine, MevOpportunity,
+    MevStats,
+};
 pub use protocol_specific::ProtocolConfig;
-pub use jupiter_arb::{JupiterArbStrategy, JupiterArbConfig, JupiterArbOpportunity};
-pub use wallet_tracker::{WalletTrackerStrategy, WalletTrackerConfig, Wallet, TokenData};
+pub use wallet_tracker::{TokenData, Wallet, WalletTrackerConfig, WalletTrackerStrategy};
 
 // 🥷 New Unified Strategy Framework
 use crate::core::types::*;
-use anyhow::{Result, anyhow};
+use anyhow::{anyhow, Result};
 use async_trait::async_trait;
 
 /// Core strategy trait for all trading strategies
@@ -99,7 +102,12 @@ impl Backtester {
         })
     }
 
-    pub async fn run(&self, strategy: &str, start_date: &str, end_date: &str) -> Result<BacktestResults> {
+    pub async fn run(
+        &self,
+        strategy: &str,
+        start_date: &str,
+        end_date: &str,
+    ) -> Result<BacktestResults> {
         // Placeholder implementation
         Ok(BacktestResults {
             total_trades: 100,

@@ -12,7 +12,7 @@ impl RpcClient {
     pub fn new(url: String) -> Self {
         Self { url }
     }
-    
+
     pub async fn call(&self, method: &str, params: serde_json::Value) -> Result<serde_json::Value> {
         // Placeholder implementation
         tracing::debug!("RPC call: {} to {}", method, self.url);

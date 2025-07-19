@@ -27,7 +27,10 @@ pub fn create_strategy(config: &StrategyConfig) -> Result<Box<dyn Strategy>> {
         "market_making" => Ok(Box::new(MarketMakingStrategy::new(config))),
         "arbitrage" => Ok(Box::new(ArbitrageStrategy::new(config))),
         "jupiter_arbitrage" => Ok(Box::new(crate::strategies::JupiterArbStrategy::new(config))),
-        _ => Err(anyhow::anyhow!("Unknown strategy: {}", config.strategy_mode)),
+        _ => Err(anyhow::anyhow!(
+            "Unknown strategy: {}",
+            config.strategy_mode
+        )),
     }
 }
 
