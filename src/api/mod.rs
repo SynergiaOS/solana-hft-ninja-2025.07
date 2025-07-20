@@ -5,6 +5,7 @@
 // 🥷 API Layer - High-Performance REST & WebSocket API
 // Unified API for trading engine control and monitoring
 
+pub mod cerberus;
 pub mod rest;
 pub mod strategy_control;
 pub mod types;
@@ -28,4 +29,5 @@ pub async fn start_server(engine: Arc<Engine>, port: u16) -> Result<()> {
     }
 }
 
+pub use cerberus::*;
 pub use strategy_control::*;

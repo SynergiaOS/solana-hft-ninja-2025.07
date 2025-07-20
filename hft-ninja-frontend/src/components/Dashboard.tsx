@@ -61,7 +61,7 @@ const Dashboard: React.FC = () => {
       profitLoss: 0.087,
       latency: 12,
       uptime: '2h 34m',
-      activeStrategies: ['Market Making', 'Arbitrage'],
+      activeStrategies: ['Market Making', 'Arbitrage', 'Cerberus Guardian'],
       mempool: { transactions: 1247, processed: 1198 }
     });
     setTradeData(mockTradeData);
@@ -77,7 +77,7 @@ const Dashboard: React.FC = () => {
     }, 5000);
 
     return () => clearInterval(interval);
-  }, []);
+  }, [mockTradeData]);
 
   const getStatusColor = (status: string) => {
     switch (status) {

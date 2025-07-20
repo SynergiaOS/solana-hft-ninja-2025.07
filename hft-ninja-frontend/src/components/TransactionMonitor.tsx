@@ -101,7 +101,7 @@ const TransactionMonitor: React.FC = () => {
     }, 5000);
 
     return () => clearInterval(interval);
-  }, []);
+  }, [mockTransactions]);
 
   const filteredTransactions = filter === 'all' 
     ? transactions 

@@ -47,6 +47,7 @@ reqwest = { version = "0.11", features = ["json", "rustls-tls"], default-feature
 url = "2.5"
 redis = { version = "0.24", features = ["tokio-comp", "aio"] }
 dragonfly-client = { version = "0.1", optional = true }
+axum = "0.7"
 
 # Metrics and monitoring
 prometheus = "0.14"
