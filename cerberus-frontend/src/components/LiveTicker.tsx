@@ -15,12 +15,14 @@ export default function LiveTicker() {
   const [data, setData] = useState<TickerData | null>(null);
   const [isConnected, setIsConnected] = useState(false);
 
-  // WebSocket connection to Cerberus API
+  // WebSocket connection to Cerberus API (only in production)
   const { lastMessage, readyState } = useWebSocket(
-    process.env.NEXT_PUBLIC_WS_URL || "ws://localhost:8080/ws/positions",
+    process.env.NODE_ENV === "production"
+      ? (process.env.NEXT_PUBLIC_WS_URL || "wss://api.cerberusso.tech/ws/positions")
+      : null,
     {
-      shouldReconnect: () => true,
-      reconnectAttempts: 10,
+      shouldReconnect: () => process.env.NODE_ENV === "production",
+      reconnectAttempts: 3,
       reconnectInterval: 3000,
     }
   );
@@ -40,9 +42,18 @@ export default function LiveTicker() {
     }
   }, [lastMessage]);
 
-  // Mock data for development
+  // Mock data for development - always use in dev mode
   useEffect(() => {
-    if (!isConnected) {
+    if (process.env.NODE_ENV === "development") {
+      // Set initial mock data
+      setData({
+        price: 23.45,
+        pnl: 2.34,
+        volume: 1250000,
+        change24h: 5.67,
+        timestamp: Date.now(),
+      });
+
       const interval = setInterval(() => {
         setData({
           price: 23.45 + (Math.random() - 0.5) * 2,
@@ -55,7 +66,7 @@ export default function LiveTicker() {
 
       return () => clearInterval(interval);
     }
-  }, [isConnected]);
+  }, []);
 
   if (!data) {
     return (

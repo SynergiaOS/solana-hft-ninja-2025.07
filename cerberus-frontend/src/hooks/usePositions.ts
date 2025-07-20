@@ -48,23 +48,24 @@ export function usePositions(): UsePositionsReturn {
   const [data, setData] = useState<PositionsData | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  // WebSocket connection
+  // WebSocket connection with better error handling
   const { lastMessage, readyState, sendMessage } = useWebSocket(
-    WEBSOCKET_URL,
+    // Only try WebSocket in production or when explicitly enabled
+    process.env.NODE_ENV === "production" ? WEBSOCKET_URL : null,
     {
-      shouldReconnect: () => true,
-      reconnectAttempts: 10,
-      reconnectInterval: (attemptNumber) => Math.min(Math.pow(2, attemptNumber) * 1000, 30000),
+      shouldReconnect: () => process.env.NODE_ENV === "production",
+      reconnectAttempts: 3,
+      reconnectInterval: 3000,
       onOpen: () => {
-        console.log("WebSocket connected");
+        console.log("WebSocket connected to:", WEBSOCKET_URL);
         setError(null);
       },
       onClose: () => {
         console.log("WebSocket disconnected");
       },
       onError: (event) => {
-        console.error("WebSocket error:", event);
-        setError("WebSocket connection failed");
+        console.warn("WebSocket connection failed, using mock data:", event);
+        setError(null); // Don't show error in development
       },
     }
   );
@@ -136,19 +137,24 @@ export function usePositions(): UsePositionsReturn {
 
   // Initial data fetch
   useEffect(() => {
-    refetch();
+    if (process.env.NODE_ENV === "production") {
+      refetch();
+    } else {
+      // Use mock data immediately in development
+      setData(getMockPositionsData());
+    }
   }, [refetch]);
 
-  // Mock data for development
+  // Mock data for development - always use in dev mode
   useEffect(() => {
-    if (readyState !== ReadyState.OPEN && process.env.NODE_ENV === "development") {
+    if (process.env.NODE_ENV === "development") {
       const interval = setInterval(() => {
         setData(getMockPositionsData());
       }, 2000);
 
       return () => clearInterval(interval);
     }
-  }, [readyState]);
+  }, []);
 
   return {
     data,
