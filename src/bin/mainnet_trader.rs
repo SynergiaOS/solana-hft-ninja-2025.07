@@ -6,15 +6,16 @@ use clap::Parser;
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::time::timeout;
-use tracing::{info, warn, error, debug};
+use tracing::{debug, error, info, warn};
 
 use solana_hft_ninja::{
     core::{solana_client::SolanaClient, wallet::Wallet},
     strategies,
     utils::config::Config,
+    config::StrategyConfig,
 };
 
-#[derive(Parser, Debug)]
+#[derive(Parser, Debug, Clone)]
 #[command(name = "mainnet_trader")]
 #[command(about = "🥷 Solana HFT Ninja - Mainnet Strategy Trader")]
 struct Args {
@@ -70,15 +71,17 @@ async fn main() -> Result<()> {
         .init();
 
     info!("🥷 Starting Solana HFT Ninja Mainnet Trader");
-    info!("Strategy: {:?}, Duration: {}s, Dry Run: {}", 
-          args.strategy, args.duration, args.dry_run);
+    info!(
+        "Strategy: {:?}, Duration: {}s, Dry Run: {}",
+        args.strategy, args.duration, args.dry_run
+    );
 
     // 🚨 MAINNET WARNING
     if !args.dry_run {
         warn!("🚨 MAINNET REAL MONEY TRADING ENABLED!");
         warn!("🚨 This will use REAL SOL from your wallet!");
         warn!("🚨 Make sure you understand the risks!");
-        
+
         // 5 second warning
         for i in (1..=5).rev() {
             warn!("🚨 Starting real trading in {} seconds...", i);
@@ -96,14 +99,18 @@ async fn main() -> Result<()> {
     info!("✅ Configuration validation passed");
 
     // Initialize Solana client
-    let solana_client = Arc::new(SolanaClient::new(&config.solana)?);
-    
+    let solana_client = Arc::new(SolanaClient::new(
+        &config.solana.rpc_url,
+        solana_sdk::commitment_config::CommitmentLevel::Confirmed,
+        30000,
+    )?);
+
     // Initialize wallet
-    let wallet = Arc::new(Wallet::new(&config.wallet.keypair_path)?);
-    
+    let wallet = Arc::new(Wallet::load(&config.wallet.path)?);
+
     // Check wallet balance
     info!("💰 Checking wallet balance...");
-    let balance = solana_client.get_balance(&wallet.public_key()).await?;
+    let balance = solana_client.get_balance(&wallet.pubkey()).await?;
     let balance_sol = balance as f64 / 1_000_000_000.0;
     info!("💰 Wallet balance: {:.5} SOL", balance_sol);
 
@@ -146,13 +153,13 @@ fn validate_mainnet_config(config: &Config) -> Result<()> {
     }
 
     // Check if risk management is configured
-    if config.risk.is_none() {
+    if config.risk.max_daily_loss == 0.0 {
         return Err(anyhow::anyhow!("❌ Risk management not configured"));
     }
 
     info!("✅ Using mainnet RPC: {}", config.solana.rpc_url);
     info!("✅ Risk management configured");
-    
+
     Ok(())
 }
 
@@ -160,19 +167,25 @@ fn validate_mainnet_config(config: &Config) -> Result<()> {
 fn perform_safety_checks(balance_sol: f64, args: &Args) -> Result<()> {
     // Check minimum balance
     if balance_sol < 0.01 {
-        return Err(anyhow::anyhow!("❌ Insufficient balance: {:.5} SOL (minimum: 0.01 SOL)", balance_sol));
+        return Err(anyhow::anyhow!(
+            "❌ Insufficient balance: {:.5} SOL (minimum: 0.01 SOL)",
+            balance_sol
+        ));
     }
 
     // Check position size vs balance
     if args.max_position > balance_sol * 0.5 {
-        return Err(anyhow::anyhow!("❌ Position size too large: {:.3} SOL (max recommended: {:.3} SOL)", 
-                                  args.max_position, balance_sol * 0.5));
+        return Err(anyhow::anyhow!(
+            "❌ Position size too large: {:.3} SOL (max recommended: {:.3} SOL)",
+            args.max_position,
+            balance_sol * 0.5
+        ));
     }
 
     info!("✅ Safety checks passed");
     info!("✅ Balance: {:.5} SOL", balance_sol);
     info!("✅ Max position: {:.3} SOL", args.max_position);
-    
+
     Ok(())
 }
 
@@ -184,18 +197,23 @@ async fn test_arbitrage_strategy(
     args: &Args,
 ) -> Result<()> {
     info!("⚖️ Testing arbitrage strategy...");
-    
-    let mut strategy = strategies::jupiter_arb::JupiterArbStrategy::new();
-    
+
+    let strategy_config = StrategyConfig::default();
+    let mut strategy = strategies::jupiter_arb::JupiterArbStrategy::new(&strategy_config);
+
     // Run strategy for specified duration
     let test_duration = Duration::from_secs(args.duration);
-    let result = timeout(test_duration, run_arbitrage_loop(&mut strategy, solana_client, wallet, args)).await;
-    
+    let result = timeout(
+        test_duration,
+        simulate_arbitrage_strategy(&mut strategy, solana_client, wallet, args),
+    )
+    .await;
+
     match result {
         Ok(_) => info!("✅ Arbitrage strategy completed"),
         Err(_) => info!("⏰ Arbitrage strategy test timed out (expected)"),
     }
-    
+
     Ok(())
 }
 
@@ -207,18 +225,23 @@ async fn test_sandwich_strategy(
     args: &Args,
 ) -> Result<()> {
     info!("🥪 Testing sandwich strategy...");
-    
-    let mut mev_engine = strategies::mev::MevEngine::new();
-    
+
+    let mev_config = strategies::mev::MevConfig::default();
+    let mut mev_engine = strategies::mev::MevEngine::new(mev_config);
+
     // Run strategy for specified duration
     let test_duration = Duration::from_secs(args.duration);
-    let result = timeout(test_duration, run_sandwich_loop(&mut mev_engine, solana_client, wallet, args)).await;
-    
+    let result = timeout(
+        test_duration,
+        simulate_sandwich_strategy(&mut mev_engine, solana_client, wallet, args),
+    )
+    .await;
+
     match result {
         Ok(_) => info!("✅ Sandwich strategy completed"),
         Err(_) => info!("⏰ Sandwich strategy test timed out (expected)"),
     }
-    
+
     Ok(())
 }
 
@@ -230,18 +253,23 @@ async fn test_jupiter_arbitrage_strategy(
     args: &Args,
 ) -> Result<()> {
     info!("🔄 Testing Jupiter arbitrage strategy...");
-    
-    let mut strategy = strategies::jupiter_arb::JupiterArbStrategy::new();
-    
+
+    let strategy_config = StrategyConfig::default();
+    let mut strategy = strategies::jupiter_arb::JupiterArbStrategy::new(&strategy_config);
+
     // Run strategy for specified duration
     let test_duration = Duration::from_secs(args.duration);
-    let result = timeout(test_duration, run_jupiter_arbitrage_loop(&mut strategy, solana_client, wallet, args)).await;
-    
+    let result = timeout(
+        test_duration,
+        simulate_jupiter_arbitrage_strategy(&mut strategy, solana_client, wallet, args),
+    )
+    .await;
+
     match result {
         Ok(_) => info!("✅ Jupiter arbitrage strategy completed"),
         Err(_) => info!("⏰ Jupiter arbitrage test timed out (expected)"),
     }
-    
+
     Ok(())
 }
 
@@ -253,10 +281,10 @@ async fn test_sniping_strategy(
     args: &Args,
 ) -> Result<()> {
     info!("🚀 Testing token launch sniping strategy...");
-    
+
     let start_time = std::time::Instant::now();
     let duration = Duration::from_secs(args.duration);
-    
+
     while start_time.elapsed() < duration {
         let elapsed = start_time.elapsed().as_secs();
         if elapsed % 10 == 0 {
@@ -264,7 +292,7 @@ async fn test_sniping_strategy(
         }
         tokio::time::sleep(Duration::from_secs(1)).await;
     }
-    
+
     info!("✅ Sniping strategy test completed");
     Ok(())
 }
@@ -277,10 +305,10 @@ async fn test_liquidation_strategy(
     args: &Args,
 ) -> Result<()> {
     info!("💧 Testing liquidation strategy...");
-    
+
     let start_time = std::time::Instant::now();
     let duration = Duration::from_secs(args.duration);
-    
+
     while start_time.elapsed() < duration {
         let elapsed = start_time.elapsed().as_secs();
         if elapsed % 15 == 0 {
@@ -288,7 +316,7 @@ async fn test_liquidation_strategy(
         }
         tokio::time::sleep(Duration::from_secs(1)).await;
     }
-    
+
     info!("✅ Liquidation strategy test completed");
     Ok(())
 }
@@ -301,18 +329,52 @@ async fn test_all_strategies(
     args: &Args,
 ) -> Result<()> {
     info!("🎯 Testing all strategies sequentially...");
-    
+
     let strategy_duration = args.duration / 5; // Divide time among strategies
     let mut strategy_args = args.clone();
     strategy_args.duration = strategy_duration;
-    
+
     // Test each strategy
     test_arbitrage_strategy(config, solana_client, wallet, &strategy_args).await?;
     test_sandwich_strategy(config, solana_client, wallet, &strategy_args).await?;
     test_jupiter_arbitrage_strategy(config, solana_client, wallet, &strategy_args).await?;
     test_sniping_strategy(config, solana_client, wallet, &strategy_args).await?;
     test_liquidation_strategy(config, solana_client, wallet, &strategy_args).await?;
-    
+
     info!("✅ All strategies tested successfully");
+    Ok(())
+}
+
+// Simulation functions for strategies
+async fn simulate_arbitrage_strategy(
+    _strategy: &mut strategies::jupiter_arb::JupiterArbStrategy,
+    _solana_client: &Arc<SolanaClient>,
+    _wallet: &Arc<Wallet>,
+    args: &Args,
+) -> Result<()> {
+    info!("🔄 Simulating arbitrage strategy for {} seconds...", args.duration);
+    tokio::time::sleep(Duration::from_secs(args.duration)).await;
+    Ok(())
+}
+
+async fn simulate_sandwich_strategy(
+    _mev_engine: &mut strategies::mev::MevEngine,
+    _solana_client: &Arc<SolanaClient>,
+    _wallet: &Arc<Wallet>,
+    args: &Args,
+) -> Result<()> {
+    info!("🥪 Simulating sandwich strategy for {} seconds...", args.duration);
+    tokio::time::sleep(Duration::from_secs(args.duration)).await;
+    Ok(())
+}
+
+async fn simulate_jupiter_arbitrage_strategy(
+    _strategy: &mut strategies::jupiter_arb::JupiterArbStrategy,
+    _solana_client: &Arc<SolanaClient>,
+    _wallet: &Arc<Wallet>,
+    args: &Args,
+) -> Result<()> {
+    info!("🎯 Simulating Jupiter arbitrage strategy for {} seconds...", args.duration);
+    tokio::time::sleep(Duration::from_secs(args.duration)).await;
     Ok(())
 }

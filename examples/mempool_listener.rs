@@ -3,7 +3,7 @@
 use solana_hft_ninja::mempool::*;
 use std::env;
 use tokio::sync::mpsc;
-use tracing::{info, error, Level};
+use tracing::{error, info, Level};
 
 #[tokio::main]
 async fn main() -> solana_hft_ninja::mempool::Result<()> {
@@ -95,7 +95,9 @@ async fn main() -> solana_hft_ninja::mempool::Result<()> {
     }
 
     // Wait for listener to finish
-    listener_handle.await.map_err(|e| solana_hft_ninja::mempool::MempoolError::Config(e.to_string()))?;
+    listener_handle
+        .await
+        .map_err(|e| solana_hft_ninja::mempool::MempoolError::Config(e.to_string()))?;
 
     Ok(())
 }

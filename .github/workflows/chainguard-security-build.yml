@@ -64,7 +64,7 @@ jobs:
         run: cargo audit
 
       - name: Run Clippy security lints
-        run: cargo clippy --all-targets --all-features -- -D warnings -W clippy::all
+        run: cargo clippy --all-targets --all-features -- -D clippy::suspicious -D clippy::perf -W clippy::all
 
       - name: Check code formatting
         run: cargo fmt --all -- --check

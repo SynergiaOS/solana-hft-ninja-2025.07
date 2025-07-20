@@ -120,9 +120,7 @@ pub struct MempoolStats {
 }
 
 /// Performance timer for measuring processing latency (second definition removed)
-
-// ProcessingTimer implementation removed to avoid duplication
-
+/// Automatically records timing when dropped
 impl Drop for ProcessingTimer {
     fn drop(&mut self) {
         let duration = self.start.elapsed();

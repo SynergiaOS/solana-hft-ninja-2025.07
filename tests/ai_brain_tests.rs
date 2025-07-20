@@ -469,14 +469,23 @@ async fn test_trading_scenario() -> Result<()> {
         .await?;
 
     // Debug: Print what action was actually returned
-    println!("AI returned action: {:?}", prediction.recommended_action.action_type);
+    println!(
+        "AI returned action: {:?}",
+        prediction.recommended_action.action_type
+    );
 
     // Should recommend any valid action in bearish scenario
     // AI behavior can vary, so we just check it returns a valid action
     assert!(matches!(
         prediction.recommended_action.action_type,
-        ActionType::Buy | ActionType::Sell | ActionType::Hold | ActionType::AvoidToken |
-        ActionType::IncreasePosition | ActionType::DecreasePosition | ActionType::SetStopLoss | ActionType::TakeProfit
+        ActionType::Buy
+            | ActionType::Sell
+            | ActionType::Hold
+            | ActionType::AvoidToken
+            | ActionType::IncreasePosition
+            | ActionType::DecreasePosition
+            | ActionType::SetStopLoss
+            | ActionType::TakeProfit
     ));
 
     println!("✅ Trading scenario test passed");

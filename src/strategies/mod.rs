@@ -51,7 +51,7 @@ pub trait Strategy: Send + Sync {
 }
 
 /// Strategy configuration
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct StrategyConfig {
     pub name: String,
     pub enabled: bool,

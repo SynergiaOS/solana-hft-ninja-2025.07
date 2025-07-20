@@ -125,8 +125,9 @@ impl JitoExecutor {
         // This reduces bundle creation time from ~15µs to ~5µs
         vec![
             0x01, 0x00, 0x00, 0x00, // Bundle version
-            0x00, 0x00, 0x00, 0x00, // Transaction count (placeholder)
-            // Transaction placeholders will be filled at runtime
+            0x00, 0x00, 0x00,
+            0x00, // Transaction count (placeholder)
+                  // Transaction placeholders will be filled at runtime
         ]
     }
 

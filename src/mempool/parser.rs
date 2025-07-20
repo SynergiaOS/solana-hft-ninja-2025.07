@@ -1,10 +1,7 @@
 //! Transaction parsing and analysis
 
 use serde::{Deserialize, Serialize};
-use solana_sdk::{
-    message::VersionedMessage, pubkey::Pubkey,
-    transaction::VersionedTransaction,
-};
+use solana_sdk::{message::VersionedMessage, pubkey::Pubkey, transaction::VersionedTransaction};
 
 use crate::mempool::{dex::*, error::*, metrics::MempoolMetrics};
 
@@ -228,10 +225,7 @@ impl TransactionBuffer {
 mod tests {
     use super::*;
     use solana_sdk::{
-        signature::Keypair,
-        signer::Signer,
-        system_instruction,
-        transaction::Transaction,
+        signature::Keypair, signer::Signer, system_instruction, transaction::Transaction,
     };
 
     #[test]

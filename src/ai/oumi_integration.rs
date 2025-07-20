@@ -169,7 +169,7 @@ struct ModelInstance {
 
 /// Performance tracking
 #[derive(Debug, Clone, Default)]
-struct PerformanceMetrics {
+pub struct PerformanceMetrics {
     total_predictions: u64,
     correct_predictions: u64,
     average_confidence: f64,
@@ -267,7 +267,7 @@ impl OumiEngine {
     }
 
     /// Analyze overall market conditions
-    pub async fn analyze_market(&self, market_data: &MarketData) -> Result<MarketAnalysis> {
+    pub async fn analyze_market(&self, _market_data: &MarketData) -> Result<MarketAnalysis> {
         if !self.config.enabled {
             return Err(anyhow::anyhow!("OUMI AI is disabled"));
         }
@@ -300,7 +300,7 @@ impl OumiEngine {
     /// Prepare features for model input
     async fn prepare_features(
         &self,
-        token_address: &str,
+        _token_address: &str,
         market_data: &MarketData,
     ) -> Result<Vec<f32>> {
         // Extract and normalize features from market data
@@ -328,7 +328,7 @@ impl OumiEngine {
     }
 
     /// Run model inference
-    async fn run_inference(&self, model_id: &str, features: &[f32]) -> Result<TradingPrediction> {
+    async fn run_inference(&self, _model_id: &str, features: &[f32]) -> Result<TradingPrediction> {
         // Simulate model inference (replace with actual OUMI integration)
         let confidence = 0.75 + (features.iter().sum::<f32>() % 0.25);
         let risk_score = 1.0 - confidence;

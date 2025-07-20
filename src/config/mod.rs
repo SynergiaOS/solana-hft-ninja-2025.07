@@ -40,7 +40,7 @@ pub struct TradingConfig {
     pub risk_limit_bps: u64,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct StrategyConfig {
     pub strategy_mode: String,
     pub update_interval_ms: u64,

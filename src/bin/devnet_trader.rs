@@ -1,14 +1,14 @@
 //! 🥷 Solana HFT Ninja - Devnet Strategy Trader
-//! 
+//!
 //! Dedicated binary for testing trading strategies on Solana devnet
 //! with comprehensive monitoring and safety features
 
-use anyhow::{Result, anyhow};
+use anyhow::{anyhow, Result};
 use clap::{Parser, ValueEnum};
 use solana_hft_ninja::*;
 use std::sync::Arc;
-use tokio::time::{Duration, timeout};
-use tracing::{info, warn, error, debug};
+use tokio::time::{timeout, Duration};
+use tracing::{debug, error, info, warn};
 
 #[derive(Parser, Clone)]
 #[command(name = "devnet-trader")]
@@ -69,8 +69,10 @@ async fn main() -> Result<()> {
     tracing_subscriber::fmt::init();
 
     info!("🥷 Starting Solana HFT Ninja Devnet Trader");
-    info!("Strategy: {:?}, Duration: {}s, Dry Run: {}", 
-          args.strategy, args.duration, args.dry_run);
+    info!(
+        "Strategy: {:?}, Duration: {}s, Dry Run: {}",
+        args.strategy, args.duration, args.dry_run
+    );
 
     // Load configuration
     let config = utils::config::Config::load(&args.config)?;
@@ -83,7 +85,7 @@ async fn main() -> Result<()> {
     let solana_client = Arc::new(core::solana_client::SolanaClient::new(
         &config.solana.rpc_url,
         solana_sdk::commitment_config::CommitmentLevel::Confirmed,
-        30000
+        30000,
     )?);
     let wallet = Arc::new(core::wallet::Wallet::load(&config.wallet.path)?);
 
@@ -92,7 +94,9 @@ async fn main() -> Result<()> {
     info!("💰 Wallet balance: {} SOL", balance);
 
     if balance < 0.1 {
-        return Err(anyhow!("Insufficient balance for testing. Need at least 0.1 SOL"));
+        return Err(anyhow!(
+            "Insufficient balance for testing. Need at least 0.1 SOL"
+        ));
     }
 
     // Initialize strategy based on selection
@@ -145,10 +149,10 @@ async fn check_wallet_balance(
     wallet: &Arc<core::wallet::Wallet>,
 ) -> Result<f64> {
     info!("💰 Checking wallet balance...");
-    
+
     let balance_lamports = solana_client.get_balance(&wallet.pubkey()).await?;
     let balance_sol = balance_lamports as f64 / 1_000_000_000.0;
-    
+
     Ok(balance_sol)
 }
 
@@ -167,10 +171,7 @@ async fn test_arbitrage_strategy(
         min_profit: args.min_profit,
         max_position: args.max_position,
         slippage_tolerance: 0.03, // 3%
-        dex_pairs: vec![
-            "raydium-jupiter".to_string(),
-            "orca-jupiter".to_string(),
-        ],
+        dex_pairs: vec!["raydium-jupiter".to_string(), "orca-jupiter".to_string()],
         execution_timeout_ms: 5000,
     };
 
@@ -185,7 +186,11 @@ async fn test_arbitrage_strategy(
 
     // Run strategy for specified duration
     let test_duration = Duration::from_secs(args.duration);
-    let result = timeout(test_duration, run_arbitrage_loop(&mut strategy, solana_client, wallet, args)).await;
+    let result = timeout(
+        test_duration,
+        run_arbitrage_loop(&mut strategy, solana_client, wallet, args),
+    )
+    .await;
 
     match result {
         Ok(_) => info!("✅ Arbitrage strategy test completed"),
@@ -220,7 +225,11 @@ async fn test_sandwich_strategy(
 
     // Run strategy for specified duration
     let test_duration = Duration::from_secs(args.duration);
-    let result = timeout(test_duration, run_sandwich_loop(&mut mev_engine, solana_client, wallet, args)).await;
+    let result = timeout(
+        test_duration,
+        run_sandwich_loop(&mut mev_engine, solana_client, wallet, args),
+    )
+    .await;
 
     match result {
         Ok(_) => info!("✅ Sandwich strategy test completed"),
@@ -245,10 +254,7 @@ async fn test_jupiter_arbitrage(
         min_profit: args.min_profit,
         max_position: args.max_position,
         slippage_tolerance: 0.025, // 2.5%
-        dex_pairs: vec![
-            "jupiter-raydium".to_string(),
-            "jupiter-orca".to_string(),
-        ],
+        dex_pairs: vec!["jupiter-raydium".to_string(), "jupiter-orca".to_string()],
         execution_timeout_ms: 3000,
     };
 
@@ -281,7 +287,7 @@ async fn test_sniping_strategy(
     args: &Args,
 ) -> Result<()> {
     info!("🚀 Testing token launch sniping strategy...");
-    
+
     // For now, just simulate sniping detection
     for i in 0..args.duration {
         if i % 10 == 0 {
@@ -302,7 +308,7 @@ async fn test_liquidation_strategy(
     args: &Args,
 ) -> Result<()> {
     info!("💧 Testing liquidation strategy...");
-    
+
     // For now, just simulate liquidation monitoring
     for i in 0..args.duration {
         if i % 15 == 0 {
@@ -352,7 +358,7 @@ async fn run_arbitrage_loop(
     loop {
         // Simulate market data analysis
         debug!("🔍 Scanning for arbitrage opportunities...");
-        
+
         // In a real implementation, this would analyze actual market data
         // For testing, we simulate opportunity detection
         if opportunities_found % 20 == 0 && opportunities_found > 0 {
@@ -363,7 +369,10 @@ async fn run_arbitrage_loop(
                 info!("💰 EXECUTING REAL ARBITRAGE TRADE!");
                 match execute_real_arbitrage_trade(solana_client, wallet, args.max_position).await {
                     Ok(signature) => {
-                        info!("✅ Real arbitrage trade executed successfully! Tx: {}", signature);
+                        info!(
+                            "✅ Real arbitrage trade executed successfully! Tx: {}",
+                            signature
+                        );
                     }
                     Err(e) => {
                         warn!("❌ Arbitrage trade failed: {}", e);
@@ -389,7 +398,7 @@ async fn run_sandwich_loop(
     loop {
         // Simulate transaction analysis
         debug!("🔍 Analyzing transactions for sandwich opportunities...");
-        
+
         // In a real implementation, this would analyze mempool transactions
         if transactions_analyzed % 30 == 0 && transactions_analyzed > 0 {
             info!("🥪 Sandwich opportunity detected!");
@@ -399,7 +408,10 @@ async fn run_sandwich_loop(
                 info!("💰 EXECUTING REAL SANDWICH ATTACK!");
                 match execute_real_sandwich_attack(solana_client, wallet, args.max_position).await {
                     Ok(signature) => {
-                        info!("✅ Real sandwich attack executed successfully! Tx: {}", signature);
+                        info!(
+                            "✅ Real sandwich attack executed successfully! Tx: {}",
+                            signature
+                        );
                     }
                     Err(e) => {
                         warn!("❌ Sandwich attack failed: {}", e);
@@ -423,7 +435,7 @@ async fn run_jupiter_loop(
     loop {
         // Simulate Jupiter route analysis
         debug!("🔄 Checking Jupiter routes for arbitrage...");
-        
+
         if routes_checked % 25 == 0 && routes_checked > 0 {
             info!("🎯 Jupiter arbitrage opportunity found!");
             if !args.dry_run {
@@ -442,7 +454,7 @@ async fn run_jupiter_loop(
 async fn execute_real_arbitrage_trade(
     solana_client: &Arc<core::solana_client::SolanaClient>,
     wallet: &Arc<core::wallet::Wallet>,
-    max_position: f64
+    max_position: f64,
 ) -> Result<String> {
     use solana_sdk::pubkey::Pubkey;
     use std::str::FromStr;
@@ -454,11 +466,15 @@ async fn execute_real_arbitrage_trade(
     // Send to a test address (burn address)
     let burn_address = Pubkey::from_str("11111111111111111111111111111112")?;
 
-    info!("🔄 Executing arbitrage: sending {} SOL ({} lamports) to burn address",
-          amount_sol, amount_lamports);
+    info!(
+        "🔄 Executing arbitrage: sending {} SOL ({} lamports) to burn address",
+        amount_sol, amount_lamports
+    );
 
     // Execute real transaction
-    let result = solana_client.send_sol_with_wallet(wallet, &burn_address, amount_lamports).await?;
+    let result = solana_client
+        .send_sol_with_wallet(wallet, &burn_address, amount_lamports)
+        .await?;
 
     info!("✅ Arbitrage transaction confirmed: {}", result.signature);
 
@@ -469,7 +485,7 @@ async fn execute_real_arbitrage_trade(
 async fn execute_real_sandwich_attack(
     solana_client: &Arc<core::solana_client::SolanaClient>,
     wallet: &Arc<core::wallet::Wallet>,
-    max_position: f64
+    max_position: f64,
 ) -> Result<String> {
     use solana_sdk::pubkey::Pubkey;
     use std::str::FromStr;
@@ -481,11 +497,15 @@ async fn execute_real_sandwich_attack(
     // Send to a test address (burn address)
     let burn_address = Pubkey::from_str("11111111111111111111111111111112")?;
 
-    info!("🥪 Executing sandwich: sending {} SOL ({} lamports) to burn address",
-          amount_sol, amount_lamports);
+    info!(
+        "🥪 Executing sandwich: sending {} SOL ({} lamports) to burn address",
+        amount_sol, amount_lamports
+    );
 
     // Execute real transaction
-    let result = solana_client.send_sol_with_wallet(wallet, &burn_address, amount_lamports).await?;
+    let result = solana_client
+        .send_sol_with_wallet(wallet, &burn_address, amount_lamports)
+        .await?;
 
     info!("✅ Sandwich transaction confirmed: {}", result.signature);
 

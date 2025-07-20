@@ -44,7 +44,7 @@ url = "2.5"
 redis = { version = "0.24", features = ["tokio-comp"] }
 
 # Metrics and monitoring
-prometheus = "0.13"
+prometheus = "0.14"
 metrics = "0.21"
 metrics-exporter-prometheus = "0.12"
 quanta = "0.11"
@@ -70,7 +70,7 @@ thiserror = "1.0"
 
 # Configuration
 config = "0.14"
-dotenv = "0.15"
+dotenvy = "0.15"
 
 # Math
 rust_decimal = "1.34"

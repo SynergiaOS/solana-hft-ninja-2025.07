@@ -7,7 +7,10 @@ use solana_hft_ninja::execution::{
     JitoConfig, JitoExecutor,
 };
 use solana_sdk::{
-    pubkey::Pubkey, signature::{Keypair, Signer}, system_instruction, transaction::Transaction,
+    pubkey::Pubkey,
+    signature::{Keypair, Signer},
+    system_instruction,
+    transaction::Transaction,
 };
 use tokio::time::{timeout, Duration};
 
@@ -19,7 +22,7 @@ async fn test_jito_tip_calculation() -> Result<()> {
 
     // Test tip calculation for different scenarios
     let test_cases = vec![
-        (1, 100, 111000),  // 1 tx, priority 100 -> min(10000) + 1000 + 100000 = 111000
+        (1, 100, 111000), // 1 tx, priority 100 -> min(10000) + 1000 + 100000 = 111000
         (3, 200, 213000), // 3 tx, priority 200 -> min(10000) + 3000 + 200000 = 213000
         (1, 50, 61000),   // 1 tx, priority 50 -> min(10000) + 1000 + 50000 = 61000
     ];
@@ -57,8 +60,11 @@ fn calculate_tip_amount(config: &JitoConfig, transactions: &[BundleTransaction])
     let mut tip = config.min_tip_lamports;
     tip += (transactions.len() as u64) * 1000;
 
-    let avg_priority: u64 =
-        transactions.iter().map(|tx| tx.priority as u64).sum::<u64>() / transactions.len() as u64;
+    let avg_priority: u64 = transactions
+        .iter()
+        .map(|tx| tx.priority as u64)
+        .sum::<u64>()
+        / transactions.len() as u64;
 
     tip += avg_priority * 1000;
     tip.min(config.max_tip_lamports)

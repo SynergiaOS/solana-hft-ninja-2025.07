@@ -1,5 +1,5 @@
 //! 🚀 High-Performance RPC Connection Pool
-//! 
+//!
 //! Optimized connection pool with 32 connections and 60s keep-alive
 
 use anyhow::Result;
@@ -41,7 +41,10 @@ pub struct RpcPool {
 impl RpcPool {
     /// Create new RPC pool with optimized settings
     pub fn new(config: RpcPoolConfig) -> Result<Self> {
-        info!("🚀 Creating RPC pool with {} connections", config.max_connections);
+        info!(
+            "🚀 Creating RPC pool with {} connections",
+            config.max_connections
+        );
 
         let client = ClientBuilder::new()
             .pool_max_idle_per_host(config.max_connections)
@@ -68,7 +71,7 @@ impl RpcPool {
         T: serde::de::DeserializeOwned,
     {
         let _permit = self.semaphore.acquire().await?;
-        
+
         let mut attempts = 0;
         let mut last_error = None;
 
@@ -77,13 +80,16 @@ impl RpcPool {
                 Ok(response) => {
                     debug!("RPC request successful on attempt {}", attempts + 1);
                     return Ok(response);
-                },
+                }
                 Err(e) => {
                     attempts += 1;
                     last_error = Some(e);
-                    
+
                     if attempts < self.config.retry_attempts {
-                        warn!("RPC request failed, retrying... (attempt {}/{})", attempts, self.config.retry_attempts);
+                        warn!(
+                            "RPC request failed, retrying... (attempt {}/{})",
+                            attempts, self.config.retry_attempts
+                        );
                         tokio::time::sleep(Duration::from_millis(100 * attempts as u64)).await;
                     }
                 }
@@ -98,7 +104,8 @@ impl RpcPool {
     where
         T: serde::de::DeserializeOwned,
     {
-        let response = self.client
+        let response = self
+            .client
             .post(url)
             .header("Content-Type", "application/json")
             .body(body.to_string())
@@ -106,12 +113,15 @@ impl RpcPool {
             .await?;
 
         if !response.status().is_success() {
-            return Err(anyhow::anyhow!("RPC request failed with status: {}", response.status()));
+            return Err(anyhow::anyhow!(
+                "RPC request failed with status: {}",
+                response.status()
+            ));
         }
 
         let text = response.text().await?;
         let result: T = serde_json::from_str(&text)?;
-        
+
         Ok(result)
     }
 
@@ -141,7 +151,7 @@ mod tests {
     async fn test_rpc_pool_creation() {
         let config = RpcPoolConfig::default();
         let pool = RpcPool::new(config).unwrap();
-        
+
         let stats = pool.get_stats();
         assert_eq!(stats.max_connections, 32);
         assert_eq!(stats.available_connections, 32);
@@ -154,21 +164,23 @@ mod tests {
             ..Default::default()
         };
         let pool = Arc::new(RpcPool::new(config).unwrap());
-        
+
         // Simulate concurrent requests
-        let handles: Vec<_> = (0..5).map(|_| {
-            let pool = pool.clone();
-            tokio::spawn(async move {
-                let _permit = pool.semaphore.acquire().await.unwrap();
-                tokio::time::sleep(Duration::from_millis(100)).await;
+        let handles: Vec<_> = (0..5)
+            .map(|_| {
+                let pool = pool.clone();
+                tokio::spawn(async move {
+                    let _permit = pool.semaphore.acquire().await.unwrap();
+                    tokio::time::sleep(Duration::from_millis(100)).await;
+                })
             })
-        }).collect();
+            .collect();
 
         // Wait for all to complete
         for handle in handles {
             handle.await.unwrap();
         }
-        
+
         let stats = pool.get_stats();
         assert_eq!(stats.available_connections, 2);
     }

@@ -207,15 +207,17 @@ impl SolanaClient {
         to: &Pubkey,
         amount_lamports: u64,
     ) -> Result<TransactionResult> {
-        use solana_sdk::{system_instruction, message::Message, transaction::Transaction};
+        use solana_sdk::{message::Message, system_instruction, transaction::Transaction};
 
         let instruction = system_instruction::transfer(&wallet.pubkey(), to, amount_lamports);
 
-        info!("💸 Sending {} lamports ({:.6} SOL) from {} to {}",
-              amount_lamports,
-              amount_lamports as f64 / 1_000_000_000.0,
-              wallet.pubkey(),
-              to);
+        info!(
+            "💸 Sending {} lamports ({:.6} SOL) from {} to {}",
+            amount_lamports,
+            amount_lamports as f64 / 1_000_000_000.0,
+            wallet.pubkey(),
+            to
+        );
 
         // Get recent blockhash
         let recent_blockhash = self.get_recent_blockhash().await?;
@@ -238,7 +240,8 @@ impl SolanaClient {
             min_context_slot: None,
         };
 
-        let signature = self.rpc_client
+        let signature = self
+            .rpc_client
             .send_transaction_with_config(&transaction, config)
             .context("Failed to send transaction")?;
 
