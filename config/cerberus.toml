@@ -1,0 +1,149 @@
+# Cerberus Trade Execution Brain Configuration
+# 🧠 Autonomous position management for Solana HFT Ninja
+
+[cerberus]
+# Decision loop interval in milliseconds
+loop_interval_ms = 200
+
+# Maximum concurrent positions
+max_concurrent_positions = 50
+
+# Default position timeout in seconds (10 minutes)
+default_timeout_seconds = 600
+
+# Enable emergency stop functionality
+emergency_stop_enabled = true
+
+[rpc]
+# Primary RPC endpoint (QuickNode Premium)
+quicknode_endpoint = "https://api.mainnet-beta.solana.com"
+
+# Fallback RPC endpoint (Helius Premium)
+helius_endpoint = "https://api.mainnet-beta.solana.com"
+
+# RPC timeout in seconds
+timeout_seconds = 10
+
+# Health check interval in seconds
+health_check_interval = 30
+
+[storage]
+# Redis/DragonflyDB connection URL
+redis_url = "redis://127.0.0.1:6379"
+
+# Connection pool size
+pool_size = 10
+
+# Connection timeout in seconds
+connection_timeout = 5
+
+[execution]
+# Jito block engine endpoint
+jito_endpoint = "https://mainnet.block-engine.jito.wtf"
+
+# Base tip amount in lamports (0.001 SOL)
+base_tip_lamports = 1000000
+
+# Maximum tip amount in lamports (0.01 SOL)
+max_tip_lamports = 10000000
+
+# Tip scaling factor (percentage of trade amount)
+tip_scaling_factor = 0.0001
+
+[risk_management]
+# Default take profit percentage
+default_take_profit_percent = 100.0
+
+# Default stop loss percentage
+default_stop_loss_percent = -25.0
+
+# Maximum position size in SOL
+max_position_size_sol = 1.0
+
+# Maximum total exposure in SOL
+max_total_exposure_sol = 5.0
+
+# Minimum liquidity requirement (multiple of position size)
+min_liquidity_multiplier = 10.0
+
+# Maximum acceptable spread percentage
+max_spread_percent = 5.0
+
+# Time-based stop loss tightening after hours
+time_based_stop_loss_hours = 2.0
+time_based_stop_loss_factor = 0.8
+
+[market_conditions]
+# Maximum acceptable volatility (24h price change %)
+max_volatility_percent = 50.0
+
+# Minimum volume requirement for trading
+min_volume_24h = 1000.0
+
+# Market data staleness threshold in seconds
+max_data_age_seconds = 5
+
+[ai_integration]
+# Enable AI signal processing
+enable_ai_signals = true
+
+# Cerebro command channel
+cerebro_channel = "cerebro_commands"
+
+# Guardian alert channel
+guardian_channel = "guardian_alerts"
+
+# AI signal timeout in seconds
+ai_signal_timeout = 30
+
+[scaling]
+# Enable position scaling (DCA)
+enable_scaling = true
+
+# Scaling threshold (percentage down from entry)
+scaling_threshold_percent = -5.0
+
+# Scaling amount (percentage of original position)
+scaling_amount_percent = 50.0
+
+# Maximum number of scale-ins per position
+max_scale_ins = 3
+
+[monitoring]
+# Enable performance metrics
+enable_metrics = true
+
+# Metrics export interval in seconds
+metrics_interval = 60
+
+# Log level (trace, debug, info, warn, error)
+log_level = "info"
+
+# Enable detailed trade logging
+enable_trade_logging = true
+
+[emergency]
+# Emergency stop triggers
+enable_global_stop = true
+
+# Maximum drawdown before emergency stop (percentage)
+max_drawdown_percent = 10.0
+
+# Maximum consecutive losses before emergency stop
+max_consecutive_losses = 5
+
+# Emergency stop cooldown in seconds
+emergency_cooldown_seconds = 300
+
+[development]
+# Enable dry run mode
+dry_run = false
+
+# Enable simulation mode
+enable_simulation = false
+
+# Test position creation
+enable_test_positions = false
+
+# Debug mode
+debug_mode = false

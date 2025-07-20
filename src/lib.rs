@@ -2,6 +2,7 @@ pub mod ai;
 pub mod api;
 pub mod bridge;
 pub mod cerebro;
+pub mod cerberus;
 pub mod config;
 pub mod core;
 pub mod engine;
@@ -20,6 +21,7 @@ pub mod utils;
 pub use ai::*;
 pub use bridge::*;
 pub use cerebro::*;
+pub use cerberus::*;
 pub use config::Config;
 pub use engine::Engine; // Specific exports to avoid conflicts
 pub use execution::*;
