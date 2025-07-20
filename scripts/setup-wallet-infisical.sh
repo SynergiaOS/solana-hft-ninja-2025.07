@@ -21,7 +21,7 @@ if ! infisical user &> /dev/null; then
     infisical login
 fi
 
-PROJECT_ID="73c2f3cb-c922-4a46-a333-7b96fbc6301a"
+PROJECT_ID="1232ea01-7ff9-4eac-be5a-c66a6cb34c88"
 ENVIRONMENT="production"
 
 echo ""

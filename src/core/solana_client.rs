@@ -201,6 +201,66 @@ impl SolanaClient {
         self.send_transaction(wallet, vec![instruction]).await
     }
 
+    pub async fn send_sol_with_wallet(
+        &self,
+        wallet: &crate::core::wallet::Wallet,
+        to: &Pubkey,
+        amount_lamports: u64,
+    ) -> Result<TransactionResult> {
+        use solana_sdk::{system_instruction, message::Message, transaction::Transaction};
+
+        let instruction = system_instruction::transfer(&wallet.pubkey(), to, amount_lamports);
+
+        info!("💸 Sending {} lamports ({:.6} SOL) from {} to {}",
+              amount_lamports,
+              amount_lamports as f64 / 1_000_000_000.0,
+              wallet.pubkey(),
+              to);
+
+        // Get recent blockhash
+        let recent_blockhash = self.get_recent_blockhash().await?;
+
+        // Create message
+        let message = Message::new(&[instruction], Some(&wallet.pubkey()));
+
+        // Create transaction
+        let mut transaction = Transaction::new_unsigned(message);
+        transaction.sign(&[wallet.keypair()], recent_blockhash);
+
+        info!("📤 Sending transaction: {}", transaction.signatures[0]);
+
+        // Send transaction
+        let config = solana_client::rpc_config::RpcSendTransactionConfig {
+            skip_preflight: false,
+            preflight_commitment: Some(self.commitment.commitment),
+            encoding: Some(UiTransactionEncoding::Base64),
+            max_retries: Some(3),
+            min_context_slot: None,
+        };
+
+        let signature = self.rpc_client
+            .send_transaction_with_config(&transaction, config)
+            .context("Failed to send transaction")?;
+
+        // Wait for confirmation
+        let start_time = std::time::Instant::now();
+        let confirmation_result = self.wait_for_confirmation(&signature).await?;
+        let execution_time = start_time.elapsed().as_millis() as u64;
+
+        info!(
+            "✅ Transaction confirmed: {} ({}ms)",
+            signature, execution_time
+        );
+
+        Ok(TransactionResult {
+            signature,
+            slot: confirmation_result.slot,
+            confirmation_status: confirmation_result.status,
+            execution_time_ms: execution_time,
+            fee_lamports: confirmation_result.fee_lamports,
+        })
+    }
+
     async fn wait_for_confirmation(&self, signature: &Signature) -> Result<ConfirmationResult> {
         let start_time = Instant::now();
         let max_wait_time = Duration::from_secs(30);

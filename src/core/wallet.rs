@@ -69,4 +69,8 @@ impl Wallet {
     pub fn pubkey(&self) -> solana_sdk::pubkey::Pubkey {
         self.keypair.pubkey()
     }
+
+    pub fn keypair(&self) -> &Keypair {
+        &self.keypair
+    }
 }

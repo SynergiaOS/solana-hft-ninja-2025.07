@@ -1,0 +1,209 @@
+# 🥷 AGGRESSIVE TEST WALLET CONFIGURATION
+# For real money testing with calculated risks
+# TEST WALLET: EEC7mX2cut2JMGP3soancH2HNMKTw4Q7ADbCfDQFgggs
+# Balance: 0.140111 SOL (~$20-30) - PERFECT FOR TESTING!
+
+[network]
+bind_address = "127.0.0.1"  # Localhost only for security
+metrics_port = 8080
+health_port = 8081
+max_connections = 100       # Conservative limit
+connection_timeout = 10000
+read_timeout = 30000
+write_timeout = 30000
+
+[solana]
+# Mainnet RPC endpoints
+rpc_url = "https://api.mainnet-beta.solana.com"
+ws_url = "wss://api.mainnet-beta.solana.com"
+commitment = "finalized"    # Highest security commitment
+rpc_timeout_ms = 60000      # Longer timeout for safety
+
+[trading]
+# Trading configuration
+max_position_size = 0.02    # Max 0.02 SOL per trade
+default_slippage = 0.02     # 2% slippage
+execution_timeout_ms = 5000 # 5 second timeout
+
+[api]
+# API configuration
+port = 8080
+cors_enabled = true
+rate_limit = 100
+
+[metrics]
+# Metrics configuration
+port = 9090
+enabled = true
+export_interval_ms = 5000
+
+# Backup endpoints for reliability
+backup_rpc_urls = [
+    "https://solana-api.projectserum.com",
+    "https://api.mainnet-beta.solana.com"
+]
+
+[helius]
+# Helius mainnet configuration
+endpoint = "wss://mainnet.helius-rpc.com"
+reconnect_interval = 10
+ping_interval = 30
+max_reconnect_attempts = 5
+connection_timeout = 15000
+
+[jito]
+# Jito bundle configuration for mainnet
+enabled = true
+endpoint = "https://mainnet.block-engine.jito.wtf"
+tip_accounts = [
+    "96gYZGLnJYVFmbjzopPSU6QiEV5fGqZNyN9nmNhvrZU5",
+    "HFqU5x63VTqvQss8hp11i4wVV8bD44PvwucfZ2bU7gRe",
+    "Cw8CFyM9FkoMi7K7Crf6HNQqf4uEMzpKw6QNghXLvLkY",
+    "ADaUMid9yfUytqMBgopwjb2DTLSokTSzL1zt6iGPaS49"
+]
+max_tip_lamports = 10000    # Ultra-conservative: 0.00001 SOL max tip
+
+[mev]
+# MEV strategy configuration - ULTRA CONSERVATIVE
+enabled = true
+max_slippage_bps = 25       # 0.25% max slippage
+min_profit_threshold_bps = 20  # 0.2% minimum profit
+risk_limit_bps = 50         # 0.5% risk limit
+
+# Execution settings
+latency_threshold_ms = 100
+execution_timeout_ms = 5000
+
+[risk]
+# 🥷 AGGRESSIVE TEST WALLET RISK MANAGEMENT 🥷
+# For 0.140111 SOL test wallet - CALCULATED RISKS
+
+# Position limits - MORE AGGRESSIVE FOR TESTING
+max_position_size = 0.02            # Max 0.02 SOL per trade (~$4)
+max_daily_positions = 20            # Max 20 trades per day
+max_concurrent_positions = 3        # Up to 3 positions at a time
+
+# Loss protection - REASONABLE FOR TEST WALLET
+max_daily_loss = 0.03               # Max 0.03 SOL loss per day (~$6)
+max_total_loss = 0.05               # Max 0.05 SOL total loss (~$10)
+stop_loss_percentage = 0.02         # 2% stop loss
+take_profit_percentage = 0.05       # 5% take profit
+
+# Emergency limits
+emergency_stop_loss = 0.05          # Emergency stop at 0.05 SOL loss
+circuit_breaker_consecutive_losses = 5  # Stop after 5 consecutive losses
+circuit_breaker_cooldown_minutes = 30   # 30 min cooldown
+
+# Balance protection
+min_balance_reserve = 0.05          # Keep 0.05 SOL as reserve
+balance_check_interval = 60         # Check balance every 60s
+
+[strategies]
+# Strategy-specific risk limits
+enabled = ["arbitrage", "jupiter_arb", "sandwich", "sniping", "liquidation"]
+config_path = "config/strategies.toml"
+
+[strategies.arbitrage]
+enabled = true
+max_position = 0.015                # Max 0.015 SOL for arbitrage (~$3)
+min_profit = 0.0005                 # Min 0.0005 SOL profit
+timeout_seconds = 30
+
+[strategies.sandwich]
+enabled = true                      # ENABLED for testing!
+max_position = 0.01                 # Max 0.01 SOL for sandwich (~$2)
+min_profit = 0.0003                 # Min 0.0003 SOL profit
+timeout_seconds = 15
+
+[strategies.jupiter_arb]
+enabled = true
+max_position = 0.012                # Max 0.012 SOL for Jupiter (~$2.5)
+min_profit = 0.0004                 # Min 0.0004 SOL profit
+timeout_seconds = 45
+
+[strategies.sniping]
+enabled = true                      # ENABLED for testing!
+max_position = 0.008                # Max 0.008 SOL for sniping (~$1.5)
+min_profit = 0.0006                 # Min 0.0006 SOL profit
+timeout_seconds = 10
+
+[strategies.liquidation]
+enabled = true                      # ENABLED for testing!
+max_position = 0.01                 # Max 0.01 SOL for liquidation (~$2)
+min_profit = 0.0003                 # Min 0.0003 SOL profit
+timeout_seconds = 60
+
+[monitoring]
+# Enhanced monitoring for real money
+enabled = true
+log_level = "info"
+metrics_enabled = true
+alerts_enabled = true
+
+# Real-time monitoring
+balance_alerts = true
+position_alerts = true
+profit_loss_alerts = true
+error_alerts = true
+
+# Alert thresholds
+profit_alert_threshold = 0.0005     # Alert on 0.0005 SOL profit
+loss_alert_threshold = 0.0002       # Alert on 0.0002 SOL loss
+balance_change_threshold = 0.001    # Alert on 0.001 SOL balance change
+
+[security]
+# Maximum security settings
+enable_tls = true
+require_authentication = true
+rate_limit_enabled = true
+rate_limit_requests_per_second = 100
+rate_limit_burst = 200
+
+# IP restrictions
+allowed_ips = ["127.0.0.1"]        # Localhost only
+
+# Audit logging
+audit_log_enabled = true
+audit_log_path = "logs/audit.log"
+transaction_log_enabled = true
+transaction_log_path = "logs/transactions.log"
+
+[wallet]
+# Wallet configuration - INFISICAL MANAGED WALLET
+path = "config/mainnet-wallet-infisical.json"  # Required field
+keypair_path = "config/mainnet-wallet-infisical.json"  # Created from Infisical
+public_key = "uqAmyJmTS34GRbj5JLA4MTofCCcRCcrT99uhkCvyiM6"
+auto_approve = false  # Required field for safety
+
+# Wallet security
+require_confirmation = true         # Require manual confirmation for trades
+dry_run_first = true               # Always test in dry-run first
+backup_enabled = true
+backup_interval_minutes = 15
+
+[logging]
+# Comprehensive logging for real money
+level = "debug"
+file_path = "logs/mainnet-trading.log"
+max_file_size = "100MB"
+max_files = 10
+console_output = true
+
+# Structured logging
+format = "json"
+include_timestamps = true
+include_thread_id = true
+include_source_location = true
+
+[alerts]
+# Alert configuration
+telegram_enabled = false           # Configure if needed
+discord_enabled = false            # Configure if needed
+email_enabled = false              # Configure if needed
+
+# Alert types
+trade_alerts = true
+error_alerts = true
+balance_alerts = true
+profit_loss_alerts = true
+system_alerts = true

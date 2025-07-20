@@ -1,0 +1,26 @@
+# 🔐 Infisical Agent Configuration
+# For Solana HFT Ninja Mainnet Trading
+
+infisical:
+  address: "https://app.infisical.com"
+
+auth:
+  type: "universal-auth"
+  config:
+    client-id: "./config/client-id"
+    client-secret: "./config/client-secret"
+    remove_client_secret_on_read: false
+
+sinks:
+  - type: "file"
+    config:
+      path: "./config/infisical-access-token"
+
+templates:
+  - source-path: "./config/wallet-template"
+    destination-path: "./config/mainnet-wallet-from-agent.json"
+    config:
+      polling-interval: 60s
+      execute:
+        timeout: 30
+        command: echo "Wallet updated from Infisical"
