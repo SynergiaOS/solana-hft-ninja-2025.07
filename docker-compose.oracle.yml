@@ -1,0 +1,249 @@
+# 🧠 Cerberus Oracle Cloud Deployment
+# Enterprise-grade deployment with Chainguard security + Cloudflare + Traefik
+
+version: '3.8'
+
+services:
+  # Traefik reverse proxy with Let's Encrypt
+  traefik:
+    image: cgr.dev/chainguard/traefik:latest
+    container_name: traefik-hardened
+    restart: unless-stopped
+    command:
+      - "--api.dashboard=true"
+      - "--api.insecure=false"
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+      - "--entrypoints.web.address=:80"
+      - "--entrypoints.websecure.address=:443"
+      - "--certificatesresolvers.letsencrypt.acme.tlschallenge=true"
+      - "--certificatesresolvers.letsencrypt.acme.email=admin@cerberusso.tech"
+      - "--certificatesresolvers.letsencrypt.acme.storage=/letsencrypt/acme.json"
+      - "--certificatesresolvers.letsencrypt.acme.caserver=https://acme-v02.api.letsencrypt.org/directory"
+      - "--log.level=INFO"
+      - "--accesslog=true"
+      - "--metrics.prometheus=true"
+      - "--metrics.prometheus.addEntryPointsLabels=true"
+      - "--metrics.prometheus.addServicesLabels=true"
+    ports:
+      - "80:80"
+      - "443:443"
+      - "8080:8080"  # Traefik dashboard
+    volumes:
+      - "/var/run/docker.sock:/var/run/docker.sock:ro"
+      - "./letsencrypt:/letsencrypt"
+    networks:
+      - cerberus-network
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.traefik.rule=Host(`origin.cerberusso.tech`)"
+      - "traefik.http.routers.traefik.entrypoints=websecure"
+      - "traefik.http.routers.traefik.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.traefik.service=api@internal"
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    cap_add:
+      - NET_BIND_SERVICE
+
+  # Cerberus Trade Execution Brain
+  cerberus:
+    image: ghcr.io/synergiaos/cerberus:latest
+    container_name: cerberus-hardened
+    restart: unless-stopped
+    environment:
+      - RUST_LOG=info
+      - RUST_BACKTRACE=1
+      - QUICKNODE_ENDPOINT=${QUICKNODE_ENDPOINT}
+      - HELIUS_ENDPOINT=${HELIUS_ENDPOINT}
+      - SOLANA_PRIVATE_KEY=${SOLANA_PRIVATE_KEY}
+      - REDIS_URL=redis://redis:6379
+    volumes:
+      - ./config:/app/config:ro
+      - ./logs:/app/logs
+    networks:
+      - cerberus-network
+    depends_on:
+      - redis
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.cerberus.rule=Host(`cerberus.cerberusso.tech`)"
+      - "traefik.http.routers.cerberus.entrypoints=websecure"
+      - "traefik.http.routers.cerberus.tls.certresolver=letsencrypt"
+      - "traefik.http.services.cerberus.loadbalancer.server.port=8080"
+    security_opt:
+      - no-new-privileges:true
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop:
+      - ALL
+
+  # Redis for position storage
+  redis:
+    image: cgr.dev/chainguard/redis:latest
+    container_name: redis-hardened
+    restart: unless-stopped
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+    volumes:
+      - redis-data:/data
+    networks:
+      - cerberus-network
+    labels:
+      - "traefik.enable=false"
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    cap_add:
+      - SETUID
+      - SETGID
+
+  # HFT Ninja Main Engine
+  hft-ninja:
+    image: ghcr.io/synergiaos/solana-hft-ninja:latest
+    container_name: hft-ninja-hardened
+    restart: unless-stopped
+    environment:
+      - RUST_LOG=info
+      - RUST_BACKTRACE=1
+    volumes:
+      - ./config:/app/config:ro
+      - ./logs:/app/logs
+    networks:
+      - cerberus-network
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.hft.rule=Host(`app.cerberusso.tech`) || Host(`api.cerberusso.tech`)"
+      - "traefik.http.routers.hft.entrypoints=websecure"
+      - "traefik.http.routers.hft.tls.certresolver=letsencrypt"
+      - "traefik.http.services.hft.loadbalancer.server.port=8080"
+    security_opt:
+      - no-new-privileges:true
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop:
+      - ALL
+
+  # Cerebro AI
+  cerebro-ai:
+    image: ghcr.io/synergiaos/cerebro-deepseek:latest
+    container_name: cerebro-ai-hardened
+    restart: unless-stopped
+    environment:
+      - PYTHONUNBUFFERED=1
+      - MODEL_NAME=deepseek-ai/deepseek-math-7b-instruct
+      - USE_QUANTIZATION=true
+      - REDIS_URL=redis://redis:6379
+    volumes:
+      - ./cerebro/models:/app/models
+      - ./cerebro/cache:/app/cache
+    networks:
+      - cerberus-network
+    depends_on:
+      - redis
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.cerebro.rule=Host(`ai.cerberusso.tech`)"
+      - "traefik.http.routers.cerebro.entrypoints=websecure"
+      - "traefik.http.routers.cerebro.tls.certresolver=letsencrypt"
+      - "traefik.http.services.cerebro.loadbalancer.server.port=8003"
+    security_opt:
+      - no-new-privileges:true
+    read_only: true
+    tmpfs:
+      - /tmp
+      - /app/cache
+    cap_drop:
+      - ALL
+
+  # Grafana for monitoring
+  grafana:
+    image: cgr.dev/chainguard/grafana:latest
+    container_name: grafana-hardened
+    restart: unless-stopped
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=cerberus2025
+      - GF_USERS_ALLOW_SIGN_UP=false
+      - GF_SECURITY_DISABLE_GRAVATAR=true
+      - GF_ANALYTICS_REPORTING_ENABLED=false
+    volumes:
+      - grafana-data:/var/lib/grafana
+    networks:
+      - cerberus-network
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.grafana.rule=Host(`grafana.cerberusso.tech`)"
+      - "traefik.http.routers.grafana.entrypoints=websecure"
+      - "traefik.http.routers.grafana.tls.certresolver=letsencrypt"
+      - "traefik.http.services.grafana.loadbalancer.server.port=3000"
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+
+  # Prometheus for metrics
+  prometheus:
+    image: cgr.dev/chainguard/prometheus:latest
+    container_name: prometheus-hardened
+    restart: unless-stopped
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--storage.tsdb.retention.time=200h'
+      - '--web.enable-lifecycle'
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    networks:
+      - cerberus-network
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.prometheus.rule=Host(`metrics.cerberusso.tech`)"
+      - "traefik.http.routers.prometheus.entrypoints=websecure"
+      - "traefik.http.routers.prometheus.tls.certresolver=letsencrypt"
+      - "traefik.http.services.prometheus.loadbalancer.server.port=9090"
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+
+  # Frontend
+  frontend:
+    image: ghcr.io/synergiaos/hft-ninja-frontend:latest
+    container_name: frontend-hardened
+    restart: unless-stopped
+    networks:
+      - cerberus-network
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.frontend.rule=Host(`dashboard.cerberusso.tech`)"
+      - "traefik.http.routers.frontend.entrypoints=websecure"
+      - "traefik.http.routers.frontend.tls.certresolver=letsencrypt"
+      - "traefik.http.services.frontend.loadbalancer.server.port=8080"
+    security_opt:
+      - no-new-privileges:true
+    read_only: true
+    tmpfs:
+      - /tmp
+      - /var/cache/nginx
+    cap_drop:
+      - ALL
+    cap_add:
+      - NET_BIND_SERVICE
+
+networks:
+  cerberus-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16
+
+volumes:
+  redis-data:
+  grafana-data:
+  prometheus-data:

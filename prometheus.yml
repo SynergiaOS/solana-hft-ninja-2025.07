@@ -1,0 +1,48 @@
+# Prometheus configuration for Cerberus monitoring
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+rule_files:
+  # - "first_rules.yml"
+  # - "second_rules.yml"
+
+scrape_configs:
+  # Prometheus itself
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+
+  # Traefik metrics
+  - job_name: 'traefik'
+    static_configs:
+      - targets: ['traefik:8080']
+    metrics_path: /metrics
+
+  # HFT Ninja metrics
+  - job_name: 'hft-ninja'
+    static_configs:
+      - targets: ['hft-ninja:8080']
+    metrics_path: /metrics
+
+  # Cerberus metrics (if exposed)
+  - job_name: 'cerberus'
+    static_configs:
+      - targets: ['cerberus:8080']
+    metrics_path: /metrics
+    scrape_interval: 5s  # More frequent for trading metrics
+
+  # Redis metrics
+  - job_name: 'redis'
+    static_configs:
+      - targets: ['redis:6379']
+
+  # Node exporter (system metrics)
+  - job_name: 'node'
+    static_configs:
+      - targets: ['localhost:9100']
+
+  # Docker metrics
+  - job_name: 'docker'
+    static_configs:
+      - targets: ['localhost:9323']

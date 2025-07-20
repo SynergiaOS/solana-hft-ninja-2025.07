@@ -97,6 +97,10 @@ build_hardened_images() {
     print_status "Building hardened HFT engine..."
     docker build -t solana-hft-ninja:chainguard-hardened .
 
+    # Build Cerberus Trade Execution Brain
+    print_status "Building hardened Cerberus..."
+    docker build -f Dockerfile.cerberus -t cerberus:chainguard-hardened .
+
     # Build Cerebro AI
     print_status "Building hardened Cerebro AI..."
     docker build -f cerebro/Dockerfile.deepseek -t cerebro-deepseek:chainguard-hardened cerebro/
@@ -122,6 +126,10 @@ run_security_scan() {
     echo ""
     print_status "Scanning HFT engine image..."
     grype solana-hft-ninja:chainguard-hardened --output table
+
+    echo ""
+    print_status "Scanning Cerberus image..."
+    grype cerberus:chainguard-hardened --output table
 
     echo ""
     print_status "Scanning Cerebro AI image..."
@@ -201,6 +209,32 @@ services:
     cap_add:
       - NET_BIND_SERVICE
 
+  cerberus:
+    image: cerberus:chainguard-hardened
+    container_name: cerberus-hardened
+    restart: unless-stopped
+    environment:
+      - RUST_LOG=info
+      - RUST_BACKTRACE=1
+      - QUICKNODE_ENDPOINT=${QUICKNODE_ENDPOINT}
+      - HELIUS_ENDPOINT=${HELIUS_ENDPOINT}
+      - SOLANA_PRIVATE_KEY=${SOLANA_PRIVATE_KEY}
+      - REDIS_URL=redis://redis:6379
+    volumes:
+      - ./config:/app/config:ro
+      - ./logs:/app/logs
+    networks:
+      - hft-network
+    depends_on:
+      - redis
+    security_opt:
+      - no-new-privileges:true
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop:
+      - ALL
+
   cerebro-ai:
     image: cerebro-deepseek:chainguard-hardened
     container_name: cerebro-ai-hardened
@@ -244,6 +278,24 @@ services:
     cap_add:
       - NET_BIND_SERVICE
 
+  redis:
+    image: cgr.dev/chainguard/redis:latest
+    container_name: redis-hardened
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    networks:
+      - hft-network
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    cap_add:
+      - SETUID
+      - SETGID
+
 networks:
   hft-network:
     driver: bridge
@@ -254,6 +306,7 @@ networks:
 volumes:
   models:
   cache:
+  redis-data:
 EOF
 
     print_success "Hardened docker-compose.chainguard.yml created"
