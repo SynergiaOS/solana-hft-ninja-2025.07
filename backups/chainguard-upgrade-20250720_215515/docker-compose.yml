@@ -1,0 +1,179 @@
+version: '3.8'
+
+services:
+  # Infisical secrets management
+  infisical:
+    image: infisical/infisical:latest
+    container_name: infisical-secrets
+    restart: unless-stopped
+    environment:
+      - INFISICAL_PROJECT_ID=73c2f3cb-c922-4a46-a333-7b96fbc6301a
+      - INFISICAL_ENVIRONMENT=production
+    volumes:
+      - ./infisical:/app/infisical
+    networks:
+      - hft-network
+    command: ["infisical", "run", "--projectId", "73c2f3cb-c922-4a46-a333-7b96fbc6301a", "--env", "production", "--", "sleep", "infinity"]
+
+  hft-ninja:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: solana-hft-ninja
+    restart: unless-stopped
+    depends_on:
+      - infisical
+    env_file:
+      - .env
+    environment:
+      # Infisical integration
+      - INFISICAL_PROJECT_ID=73c2f3cb-c922-4a46-a333-7b96fbc6301a
+      - INFISICAL_ENVIRONMENT=production
+    volumes:
+      - ./config:/app/config
+      - ./logs:/app/logs
+      - ./data:/app/data
+      - ./infisical:/app/infisical
+    ports:
+      - "8080:8080"
+    networks:
+      - hft-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: prometheus
+    restart: unless-stopped
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    networks:
+      - hft-network
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: grafana
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+    volumes:
+      - grafana-storage:/var/lib/grafana
+    networks:
+      - hft-network
+
+  # 🧮 DeepSeek-Math Small Expert Model (Cost-Effective AI)
+  deepseek-math:
+    build:
+      context: ./cerebro
+      dockerfile: Dockerfile.deepseek
+    environment:
+      - PYTHONPATH=/app
+      - HUGGINGFACE_TOKEN=${HUGGINGFACE_TOKEN}
+      - CUDA_VISIBLE_DEVICES=0
+      - PYTORCH_CUDA_ALLOC_CONF=max_split_size_mb:512
+      - MODEL_NAME=deepseek-ai/deepseek-math-7b-instruct
+      - USE_QUANTIZATION=true
+      - USE_LMCACHE=true
+      - CACHE_SIZE_MB=1024
+    volumes:
+      - ./cerebro:/app
+      - deepseek_models:/app/models
+      - deepseek_cache:/app/cache
+    networks:
+      - hft-network
+    ports:
+      - "8003:8003"  # DeepSeek-Math API
+    deploy:
+      resources:
+        limits:
+          memory: 8G
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8003/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    restart: unless-stopped
+
+  # 🔄 n8n Workflow Automation with MCP Support
+  n8n:
+    image: n8nio/n8n:latest
+    container_name: n8n-automation
+    restart: unless-stopped
+    environment:
+      - N8N_BASIC_AUTH_ACTIVE=true
+      - N8N_BASIC_AUTH_USER=admin
+      - N8N_BASIC_AUTH_PASSWORD=cerebro123
+      - N8N_HOST=0.0.0.0
+      - N8N_PORT=5678
+      - N8N_PROTOCOL=http
+      - WEBHOOK_URL=http://n8n:5678
+      - GENERIC_TIMEZONE=UTC
+      - N8N_LOG_LEVEL=info
+      - N8N_METRICS=true
+      - N8N_DIAGNOSTICS_ENABLED=false
+      - N8N_VERSION_NOTIFICATIONS_ENABLED=false
+      - N8N_TEMPLATES_ENABLED=true
+      - N8N_ONBOARDING_FLOW_DISABLED=true
+      - N8N_PERSONALIZATION_ENABLED=false
+      # Integration with Cerebro services
+      - CEREBRO_BFF_URL=http://cerebro-bff:8000
+      - HFT_NINJA_URL=http://hft-ninja:8080
+      - PROMETHEUS_URL=http://prometheus:9090
+      - GRAFANA_URL=http://grafana:3000
+    volumes:
+      - n8n-data:/home/node/.n8n
+      - ./n8n/workflows:/home/node/.n8n/workflows
+      - ./n8n/credentials:/home/node/.n8n/credentials
+      - ./n8n/nodes:/home/node/.n8n/nodes
+      - ./n8n/mcp:/home/node/.n8n/mcp
+    ports:
+      - "5678:5678"  # n8n UI
+      - "3001:3001"  # MCP Server
+    networks:
+      - hft-network
+    depends_on:
+      - hft-ninja
+      - prometheus
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:5678/healthz || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+        reservations:
+          memory: 512M
+
+volumes:
+  prometheus_data:
+    driver: local
+  grafana-storage:
+    driver: local
+  # 🧮 DeepSeek-Math volumes
+  deepseek_models:
+    driver: local
+  deepseek_cache:
+    driver: local
+  # 🔄 n8n volumes
+  n8n-data:
+    driver: local
+
+networks:
+  hft-network:
+    driver: bridge

@@ -3,24 +3,25 @@ FROM cgr.dev/chainguard/rust:latest-dev as builder
 
 WORKDIR /app
 
-# Chainguard rust:latest-dev comes with essential build tools pre-installed
-# Including OpenSSL development libraries and pkg-config
-# No additional packages needed - security hardened by default
+# Install OpenSSL development packages for Chainguard
+USER root
+RUN apk add --no-cache openssl-dev pkgconfig
+USER nonroot
 
 # Copy manifests
-COPY Cargo.toml ./
+COPY Cargo.toml Cargo.lock ./
 
 # Build dependencies (cached layer)
-RUN mkdir -p src/bin && echo "fn main() {}" > src/main.rs
+RUN mkdir -p src/bin && echo "fn main() {}" > src/bin/main.rs
 RUN cargo build --release && rm -rf src
 
 # Copy source code
 COPY src ./src
 COPY config ./config
 
-# Build application with static linking for distroless compatibility
-ENV RUSTFLAGS="-C target-feature=+crt-static"
-RUN cargo build --release --bin hft-ninja --target x86_64-unknown-linux-gnu
+# Build application
+RUN touch src/main.rs
+RUN cargo build --release --bin hft_main
 
 # 🚀 PRODUCTION RUNTIME - CHAINGUARD STATIC (DISTROLESS)
 FROM cgr.dev/chainguard/static:latest
@@ -35,7 +36,7 @@ WORKDIR /app
 # - Ultra-minimal: ~2MB total size
 
 # Copy binary and config (static binary, no dependencies needed)
-COPY --from=builder /app/target/x86_64-unknown-linux-gnu/release/hft-ninja /usr/local/bin/hft-ninja
+COPY --from=builder /app/target/release/hft_main /usr/local/bin/hft_main
 COPY --from=builder /app/config /app/config
 
 # Use built-in non-root user from Chainguard
@@ -50,5 +51,5 @@ ENV RUST_LOG=info
 ENV RUST_BACKTRACE=1
 
 # Run the hardened HFT application
-ENTRYPOINT ["/usr/local/bin/hft-ninja"]
+ENTRYPOINT ["/usr/local/bin/hft_main"]
 CMD ["--enable-helius", "--enable-mev", "--enable-jito"]

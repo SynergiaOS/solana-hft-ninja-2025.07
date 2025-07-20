@@ -1,0 +1,281 @@
+version: '3.8'
+
+# Oracle Free Tier ARM Ampere Deployment
+# 4 OCPU + 24 GB RAM - Optimized for ARM64 architecture
+# Total resource allocation: ~9.5 GB RAM / 24 GB (40% utilization)
+
+services:
+  # HFT Ninja Trading Engine - ARM64 optimized
+  hft-ninja:
+    build:
+      context: .
+      dockerfile: Dockerfile.arm64
+      args:
+        - BUILDPLATFORM=linux/arm64
+        - TARGETPLATFORM=linux/arm64
+    platform: linux/arm64
+    container_name: hft-ninja-arm
+    environment:
+      - RUST_LOG=info
+      - SOLANA_RPC_URL=${SOLANA_RPC_URL:-https://api.devnet.solana.com}
+      - PRIVATE_KEY_PATH=/app/config/wallet.json
+      - ARM_OPTIMIZATION=true
+      - NEON_SIMD=true
+    volumes:
+      - ./config:/app/config:ro
+      - ./logs:/app/logs
+    ports:
+      - "8080:8080"
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+          cpus: '1.5'
+        reservations:
+          memory: 1G
+          cpus: '1.0'
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - hft-network
+
+  # DeepSeek-Math AI - ARM64 optimized with quantization
+  deepseek-math:
+    build:
+      context: ./cerebro
+      dockerfile: Dockerfile.deepseek-arm64
+      args:
+        - BUILDPLATFORM=linux/arm64
+        - TARGETPLATFORM=linux/arm64
+    platform: linux/arm64
+    container_name: deepseek-math-arm
+    environment:
+      - MODEL_NAME=deepseek-ai/deepseek-math-7b-instruct
+      - USE_QUANTIZATION=true
+      - USE_LMCACHE=true
+      - CACHE_SIZE_MB=512
+      - ARM_OPTIMIZATION=true
+      - PYTORCH_CUDA_ALLOC_CONF=max_split_size_mb:256
+      - OMP_NUM_THREADS=4
+      - ARM_COMPUTE_LIBRARY=1
+      - NEON_OPTIMIZATION=1
+      - MAX_DAILY_AI_COST=1.0
+      - PREFER_CACHE=true
+      - BATCH_REQUESTS=true
+    volumes:
+      - ./cerebro/models:/app/models
+      - ./cerebro/cache:/app/cache
+      - ./logs:/app/logs
+    ports:
+      - "8003:8003"
+    deploy:
+      resources:
+        limits:
+          memory: 6G
+          cpus: '1.5'
+        reservations:
+          memory: 4G
+          cpus: '1.0'
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8003/health"]
+      interval: 60s
+      timeout: 15s
+      retries: 3
+    networks:
+      - hft-network
+
+  # React Dashboard - Lightweight ARM build
+  dashboard:
+    build:
+      context: ./hft-ninja-frontend
+      dockerfile: Dockerfile.arm64
+      args:
+        - BUILDPLATFORM=linux/arm64
+        - TARGETPLATFORM=linux/arm64
+    platform: linux/arm64
+    container_name: dashboard-arm
+    environment:
+      - NODE_ENV=production
+      - REACT_APP_API_URL=http://localhost:8080
+      - REACT_APP_AI_API_URL=http://localhost:8003
+      - ARM_BUILD=true
+    ports:
+      - "3000:3000"
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: '0.5'
+        reservations:
+          memory: 256M
+          cpus: '0.2'
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - hft-network
+    depends_on:
+      - hft-ninja
+
+  # Redis Cache - ARM64 Alpine
+  redis:
+    image: redis:7-alpine
+    platform: linux/arm64
+    container_name: redis-cache-arm
+    command: redis-server --maxmemory 100mb --maxmemory-policy allkeys-lru
+    volumes:
+      - redis-data:/data
+    ports:
+      - "6379:6379"
+    deploy:
+      resources:
+        limits:
+          memory: 128M
+          cpus: '0.2'
+        reservations:
+          memory: 64M
+          cpus: '0.1'
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    networks:
+      - hft-network
+
+  # Kestra Workflow Engine - ARM64
+  kestra:
+    image: kestra/kestra:latest-full
+    platform: linux/arm64
+    container_name: kestra-arm
+    environment:
+      - KESTRA_CONFIGURATION_PATH=/app/kestra.yml
+      - KESTRA_PLUGINS_PATH=/app/plugins
+      - ARM_OPTIMIZATION=true
+    volumes:
+      - ./kestra:/app/kestra
+      - ./kestra/flows:/app/flows
+      - kestra-data:/app/storage
+    ports:
+      - "8085:8080"
+    deploy:
+      resources:
+        limits:
+          memory: 800M
+          cpus: '0.3'
+        reservations:
+          memory: 400M
+          cpus: '0.2'
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 60s
+      timeout: 10s
+      retries: 3
+    networks:
+      - hft-network
+
+  # Nginx Reverse Proxy - ARM64 Alpine
+  nginx:
+    image: nginx:alpine
+    platform: linux/arm64
+    container_name: nginx-proxy-arm
+    volumes:
+      - ./nginx/nginx.oracle.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/ssl:/etc/nginx/ssl:ro
+    ports:
+      - "80:80"
+      - "443:443"
+    deploy:
+      resources:
+        limits:
+          memory: 64M
+          cpus: '0.1'
+        reservations:
+          memory: 32M
+          cpus: '0.05'
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    networks:
+      - hft-network
+    depends_on:
+      - hft-ninja
+      - dashboard
+      - deepseek-math
+
+  # Prometheus Monitoring - ARM64
+  prometheus:
+    image: prom/prometheus:latest
+    platform: linux/arm64
+    container_name: prometheus-arm
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--storage.tsdb.retention.time=7d'
+      - '--web.enable-lifecycle'
+    volumes:
+      - ./monitoring/prometheus.oracle.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    ports:
+      - "9090:9090"
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: '0.2'
+        reservations:
+          memory: 128M
+          cpus: '0.1'
+    restart: unless-stopped
+    networks:
+      - hft-network
+
+volumes:
+  redis-data:
+    driver: local
+  kestra-data:
+    driver: local
+  prometheus-data:
+    driver: local
+
+networks:
+  hft-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16
+
+# Oracle Free Tier Resource Summary:
+# Total RAM Usage: ~9.5 GB / 24 GB (40% utilization)
+# Total CPU Usage: ~4.0 OCPU / 4 OCPU (100% allocation)
+# 
+# Service Breakdown:
+# - HFT Ninja: 2 GB RAM, 1.5 OCPU
+# - DeepSeek-Math: 6 GB RAM, 1.5 OCPU  
+# - Dashboard: 512 MB RAM, 0.5 OCPU
+# - Redis: 128 MB RAM, 0.2 OCPU
+# - Kestra: 800 MB RAM, 0.3 OCPU
+# - Nginx: 64 MB RAM, 0.1 OCPU
+# - Prometheus: 256 MB RAM, 0.2 OCPU
+# - System Buffer: 14.5 GB RAM available
+#
+# Performance Targets:
+# - AI Latency: <300ms (ARM optimized)
+# - Trading Latency: <80ms
+# - Memory Usage: <60%
+# - Daily Cost: $0 (Oracle Free Tier)

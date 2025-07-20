@@ -1,0 +1,218 @@
+# Complete Project Cerebro Docker Compose
+# Full production-ready deployment with all components
+
+version: '3.8'
+
+services:
+  # Cerebro BFF - Backend for Frontend
+  cerebro-bff:
+    build:
+      context: ./bff
+      dockerfile: Dockerfile
+    container_name: cerebro-bff
+    ports:
+      - "8000:8000"
+    environment:
+      - DRAGONFLY_URL=rediss://default:57q5c8g81u6q@pj1augq7v.dragonflydb.cloud:6385
+      - HFT_NINJA_API_URL=http://host.docker.internal:8080
+      - ENVIRONMENT=production
+      - PYTHONPATH=/app
+    volumes:
+      - ./bff:/app
+      - ./logs:/app/logs
+    networks:
+      - cerebro-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    depends_on:
+      - redis-insight
+
+  # Redis Insight for DragonflyDB monitoring
+  redis-insight:
+    image: redislabs/redisinsight:latest
+    container_name: cerebro-redis-insight
+    ports:
+      - "8001:8001"
+    environment:
+      - RIPORT=8001
+    volumes:
+      - redis-insight-data:/db
+    networks:
+      - cerebro-network
+    restart: unless-stopped
+
+  # Kestra Orchestrator
+  kestra:
+    image: kestra/kestra:latest
+    container_name: cerebro-kestra
+    ports:
+      - "8002:8080"
+    environment:
+      - KESTRA_CONFIGURATION=/app/kestra.yml
+      - CEREBRO_BFF_URL=http://cerebro-bff:8000
+      - DRAGONFLY_URL=rediss://default:57q5c8g81u6q@pj1augq7v.dragonflydb.cloud:6385
+      - HFT_NINJA_API_URL=http://host.docker.internal:8080
+      - PROMETHEUS_URL=http://host.docker.internal:9090
+    volumes:
+      - ./kestra/kestra.yml:/app/kestra.yml
+      - ./kestra/flows:/app/flows
+      - kestra-data:/app/storage
+    networks:
+      - cerebro-network
+    restart: unless-stopped
+    depends_on:
+      - cerebro-bff
+
+  # Prometheus for metrics collection
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: cerebro-prometheus
+    ports:
+      - "9090:9090"
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--storage.tsdb.retention.time=200h'
+      - '--web.enable-lifecycle'
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus-data:/prometheus
+    networks:
+      - cerebro-network
+    restart: unless-stopped
+
+  # Grafana for visualization
+  grafana:
+    image: grafana/grafana:latest
+    container_name: cerebro-grafana
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=cerebro123
+      - GF_USERS_ALLOW_SIGN_UP=false
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./monitoring/grafana/dashboards:/etc/grafana/provisioning/dashboards
+      - ./monitoring/grafana/datasources:/etc/grafana/provisioning/datasources
+    networks:
+      - cerebro-network
+    restart: unless-stopped
+    depends_on:
+      - prometheus
+
+  # Nginx reverse proxy
+  nginx:
+    image: nginx:alpine
+    container_name: cerebro-nginx
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf
+      - ./nginx/ssl:/etc/nginx/ssl
+      - ./frontend/dist:/usr/share/nginx/html
+    networks:
+      - cerebro-network
+    restart: unless-stopped
+    depends_on:
+      - cerebro-bff
+      - grafana
+      - kestra
+
+  # Log aggregation with Loki
+  loki:
+    image: grafana/loki:latest
+    container_name: cerebro-loki
+    ports:
+      - "3100:3100"
+    command: -config.file=/etc/loki/local-config.yaml
+    volumes:
+      - loki-data:/loki
+    networks:
+      - cerebro-network
+    restart: unless-stopped
+
+  # Log shipping with Promtail
+  promtail:
+    image: grafana/promtail:latest
+    container_name: cerebro-promtail
+    volumes:
+      - ./logs:/var/log/cerebro
+      - ./monitoring/promtail.yml:/etc/promtail/config.yml
+    command: -config.file=/etc/promtail/config.yml
+    networks:
+      - cerebro-network
+    restart: unless-stopped
+    depends_on:
+      - loki
+
+  # Health check service
+  healthcheck:
+    image: alpine:latest
+    container_name: cerebro-healthcheck
+    command: |
+      sh -c "
+        apk add --no-cache curl &&
+        while true; do
+          echo 'Health check at $(date)' &&
+          curl -f http://cerebro-bff:8000/health || echo 'BFF health check failed' &&
+          curl -f http://kestra:8080/api/v1/health || echo 'Kestra health check failed' &&
+          curl -f http://grafana:3000/api/health || echo 'Grafana health check failed' &&
+          sleep 60
+        done
+      "
+    networks:
+      - cerebro-network
+    restart: unless-stopped
+    depends_on:
+      - cerebro-bff
+      - kestra
+      - grafana
+
+networks:
+  cerebro-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16
+
+volumes:
+  redis-insight-data:
+    driver: local
+  kestra-data:
+    driver: local
+  prometheus-data:
+    driver: local
+  grafana-data:
+    driver: local
+  loki-data:
+    driver: local
+
+# Environment-specific overrides
+x-development: &development
+  environment:
+    - ENVIRONMENT=development
+    - DEBUG=true
+    - LOG_LEVEL=DEBUG
+
+x-production: &production
+  environment:
+    - ENVIRONMENT=production
+    - DEBUG=false
+    - LOG_LEVEL=INFO
+  deploy:
+    resources:
+      limits:
+        memory: 1G
+        cpus: '0.5'
+      reservations:
+        memory: 512M
+        cpus: '0.25'
