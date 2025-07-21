@@ -2,8 +2,8 @@
 # Optimized for ARM Ampere architecture with minimal memory footprint
 
 # Core AI/ML libraries - ARM64 optimized versions
-transformers==4.36.2
-torch==2.1.2
+transformers==4.52.0
+torch==2.7.1
 tokenizers==0.15.0
 accelerate==0.25.0
 bitsandbytes==0.41.3
@@ -27,7 +27,7 @@ diskcache==5.6.3
 # HTTP and networking
 httpx==0.25.2
 aiohttp==3.9.1
-requests==2.31.0
+requests==2.32.4
 
 # Data processing
 numpy==1.24.4
@@ -56,7 +56,7 @@ httpx==0.25.2
 
 # Security
 cryptography==41.0.8
-python-jose[cryptography]==3.3.0
+python-jose==3.4.0
 
 # Memory profiling (for optimization)
 memory-profiler==0.61.0
@@ -85,7 +85,7 @@ numba==0.58.1
 
 # Model compression
 torch-pruning==1.2.7
-neural-compressor==2.4.1
+neural-compressor==2.5
 
 # ARM64 specific BLAS libraries
 openblas-dev==0.3.24
@@ -124,7 +124,7 @@ py-spy==0.3.14
 line-profiler==4.1.1
 
 # Model optimization for ARM
-onnx==1.15.0
+onnx==1.17.0
 onnx-simplifier==0.4.35
 
 # Distributed computing
@@ -158,3 +158,12 @@ text-generation-inference==1.4.0
 # ARM64 SIMD optimizations
 neon-intrinsics==1.0.0
 arm-neon-tests==1.0.0
+fonttools>=4.43.0 # not directly required, pinned by Snyk to avoid a vulnerability
+h11>=0.16.0 # not directly required, pinned by Snyk to avoid a vulnerability
+pillow>=10.3.0 # not directly required, pinned by Snyk to avoid a vulnerability
+protobuf>=4.25.8 # not directly required, pinned by Snyk to avoid a vulnerability
+scikit-learn>=1.5.0 # not directly required, pinned by Snyk to avoid a vulnerability
+setuptools>=78.1.1 # not directly required, pinned by Snyk to avoid a vulnerability
+urllib3>=2.5.0 # not directly required, pinned by Snyk to avoid a vulnerability
+wheel>=0.38.0 # not directly required, pinned by Snyk to avoid a vulnerability
+zipp>=3.19.1 # not directly required, pinned by Snyk to avoid a vulnerability
