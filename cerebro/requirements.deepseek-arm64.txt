@@ -2,8 +2,8 @@
 # Optimized for ARM Ampere architecture with minimal memory footprint
 
 # Core AI/ML libraries - ARM64 optimized versions
-transformers==4.36.2
-torch==2.1.2
+transformers==4.53.0
+torch==2.8.0
 tokenizers==0.15.0
 accelerate==0.25.0
 bitsandbytes==0.41.3
