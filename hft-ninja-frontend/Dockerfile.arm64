@@ -38,7 +38,7 @@ ENV IMAGE_INLINE_SIZE_LIMIT=0
 RUN npm run build
 
 # Production stage - minimal ARM64 Nginx
-FROM nginx:alpine
+FROM nginx:1.29.3-alpine3.22
 
 # Install curl for health checks
 RUN apk add --no-cache curl
