@@ -3,7 +3,7 @@
 
 # Core AI/ML libraries - ARM64 optimized versions
 transformers==4.36.2
-torch==2.1.2
+torch==2.9.0
 tokenizers==0.15.0
 accelerate==0.25.0
 bitsandbytes==0.41.3
